@@ -20,3 +20,4 @@ serde_json = { version = "1.0" }
 syntect = { version = "5.2.0" }
 xi-core-lib = { git = "https://github.com/xi-editor/xi-editor" }
 xi-rpc = { git = "https://github.com/xi-editor/xi-editor" }
+tuan-rpc = { path = "crates/tuan-rpc" }

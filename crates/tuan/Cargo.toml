@@ -8,3 +8,5 @@ publish.workspace = true
 xilem.workspace = true
 winit.workspace = true
 masonry.workspace = true
+log.workspace = true
+tuan-rpc.workspace = true
