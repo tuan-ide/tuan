@@ -1,0 +1,18 @@
+# This crate is significantly a copy of the `tau-rpc` crate.
+# https://gitlab.gnome.org/World/Tau
+
+[package]
+name = "tuan-rpc"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+glib.workspace = true
+log.workspace = true
+pipe.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+syntect.workspace = true
+xi-core-lib.workspace = true
+xi-rpc.workspace = true
