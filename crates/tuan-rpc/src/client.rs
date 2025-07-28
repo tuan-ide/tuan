@@ -5,16 +5,16 @@
 use crate::message::{Message, Notification, Request, Response};
 use crate::*;
 use log::*;
-use pipe::{pipe, PipeReader, PipeWriter};
-use serde_json::{self, from_value, json, to_vec, Value};
+use pipe::{PipeReader, PipeWriter, pipe};
+use serde_json::{self, Value, from_value, json, to_vec};
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::io::BufRead;
 use std::io::Write;
-use std::sync::mpsc::{channel, Receiver};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::mpsc::{Receiver, channel};
 use std::thread;
 use xi_core_lib::XiCore;
 use xi_rpc::RpcLoop;
@@ -53,82 +53,87 @@ impl Client {
         thread::spawn(move || {
             let mut buf = String::new();
             while receiver.read_line(&mut buf).is_ok() {
-                    let msg = Message::decode(&buf).unwrap();
-                    trace!("Received message from xi: {:?}", msg);
-                    match msg {
-                        Message::Request(res) => {
-                            let Request { method, params, id } = res;
-                                let operation = match method.as_str() {
-                                    "measure_width" => {
-                                        RpcOperations::MeasureWidth((id, from_value::<MeasureWidth>(params).unwrap()))
-                                    }
-                                    _ => {
-                                        unreachable!("Unknown method {}", method);
-                                    }
-                                };
-                                frontend_sender.send(operation).unwrap();
-                        }
-                        Message::Response(res) => {
-                            let Response { id, result } = res;
-                            if let Some(cb) = pending_requests.lock().unwrap().remove(&id) {
-                                cb.call(result);
+                if buf.is_empty() {
+                    continue;
+                }
+
+                let msg = Message::decode(&buf).unwrap();
+                trace!("Received message from xi: {:?}", msg);
+                match msg {
+                    Message::Request(res) => {
+                        let Request { method, params, id } = res;
+                        let operation = match method.as_str() {
+                            "measure_width" => RpcOperations::MeasureWidth((
+                                id,
+                                from_value::<MeasureWidth>(params).unwrap(),
+                            )),
+                            _ => {
+                                unreachable!("Unknown method {}", method);
                             }
-                        }
-                        Message::Notification(res) => {
-                            let Notification { method, params } = res;
-                            let operation = match method.as_str() {
-                                "update" => {
-                                    RpcOperations::Update(from_value::<Update>(params).unwrap())
-                                }
-                                "scroll_to" => {
-                                    RpcOperations::ScrollTo(from_value::<ScrollTo>(params).unwrap())
-                                }
-                                "def_style" => {
-                                    RpcOperations::DefStyle(from_value::<Style>(params).unwrap())
-                                }
-                                "available_plugins" => {
-                                    RpcOperations::AvailablePlugins(from_value::<AvailablePlugins>(params).unwrap())
-                                }
-                                "plugin_started" => {
-                                    RpcOperations::PluginStarted(from_value::<PluginStarted>(params).unwrap())
-                                }
-                                "plugin_stopped" => {
-                                    RpcOperations::PluginStopped(from_value::<PluginStopped>(params).unwrap())
-                                }
-                                "update_cmds" => {
-                                    RpcOperations::UpdateCmds(from_value::<UpdateCmds>(params).unwrap())
-                                }
-                                "config_changed" => {
-                                    RpcOperations::ConfigChanged(from_value::<ConfigChanged>(params).unwrap())
-                                }
-                                "theme_changed" => {
-                                    RpcOperations::ThemeChanged(from_value::<ThemeChanged>(params).unwrap())
-                                }
-                                "alert" => {
-                                    RpcOperations::Alert(from_value::<Alert>(params).unwrap())
-                                }
-                                "available_themes" => {
-                                    RpcOperations::AvailableThemes(from_value::<AvailableThemes>(params).unwrap())
-                                }
-                                "find_status" => {
-                                    RpcOperations::FindStatus(from_value::<FindStatus>(params).unwrap())
-                                }
-                                "replace_status" => {
-                                    RpcOperations::ReplaceStatus(from_value::<ReplaceStatus>(params).unwrap())
-                                }
-                                "available_languages" => {
-                                    RpcOperations::AvailableLanguages(from_value::<AvailableLanguages>(params).unwrap())
-                                }
-                                "language_changed" => {
-                                    RpcOperations::LanguageChanged(from_value::<LanguageChanged>(params).unwrap())
-                                }
-                                _ => unreachable!("Unknown method {}", method),
-                            };
-                            frontend_sender.send(operation).unwrap();
+                        };
+                        frontend_sender.send(operation).unwrap();
+                    }
+                    Message::Response(res) => {
+                        let Response { id, result } = res;
+                        if let Some(cb) = pending_requests.lock().unwrap().remove(&id) {
+                            cb.call(result);
                         }
                     }
-                    buf.clear();
+                    Message::Notification(res) => {
+                        let Notification { method, params } = res;
+                        let operation = match method.as_str() {
+                            "update" => {
+                                RpcOperations::Update(from_value::<Update>(params).unwrap())
+                            }
+                            "scroll_to" => {
+                                RpcOperations::ScrollTo(from_value::<ScrollTo>(params).unwrap())
+                            }
+                            "def_style" => {
+                                RpcOperations::DefStyle(from_value::<Style>(params).unwrap())
+                            }
+                            "available_plugins" => RpcOperations::AvailablePlugins(
+                                from_value::<AvailablePlugins>(params).unwrap(),
+                            ),
+                            "plugin_started" => RpcOperations::PluginStarted(
+                                from_value::<PluginStarted>(params).unwrap(),
+                            ),
+                            "plugin_stopped" => RpcOperations::PluginStopped(
+                                from_value::<PluginStopped>(params).unwrap(),
+                            ),
+                            "update_cmds" => {
+                                RpcOperations::UpdateCmds(from_value::<UpdateCmds>(params).unwrap())
+                            }
+                            "config_changed" => RpcOperations::ConfigChanged(
+                                from_value::<ConfigChanged>(params).unwrap(),
+                            ),
+                            "theme_changed" => RpcOperations::ThemeChanged(
+                                from_value::<ThemeChanged>(params).unwrap(),
+                            ),
+                            "alert" => RpcOperations::Alert(from_value::<Alert>(params).unwrap()),
+                            "available_themes" => RpcOperations::AvailableThemes(
+                                from_value::<AvailableThemes>(params).unwrap(),
+                            ),
+                            "find_status" => {
+                                RpcOperations::FindStatus(from_value::<FindStatus>(params).unwrap())
+                            }
+                            "replace_status" => RpcOperations::ReplaceStatus(
+                                from_value::<ReplaceStatus>(params).unwrap(),
+                            ),
+                            "available_languages" => RpcOperations::AvailableLanguages(
+                                from_value::<AvailableLanguages>(params).unwrap(),
+                            ),
+                            "language_changed" => RpcOperations::LanguageChanged(
+                                from_value::<LanguageChanged>(params).unwrap(),
+                            ),
+                            _ => unreachable!("Unknown method {}", method),
+                        };
+                        if let Err(e) = frontend_sender.send(operation) {
+                            println!("Failed to send operation to frontend: {}", e);
+                        }
+                    }
                 }
+                buf.clear();
+            }
         });
 
         (client, frontend_receiver)

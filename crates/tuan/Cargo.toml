@@ -10,3 +10,7 @@ winit.workspace = true
 masonry.workspace = true
 log.workspace = true
 tuan-rpc.workspace = true
+glib.workspace = true
+crossbeam-channel = "0.5.15"
+include_dir.workspace = true
+dirs = "6.0.0"

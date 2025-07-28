@@ -1,0 +1,22 @@
+[package]
+name = "tuan-xi-syntect-plugin"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license = "Apache-2.0"
+authors = ["Raph Levien <raph@google.com>", "Arthur Fontaine"]
+repository = "https://github.com/arthur-fontaine/tuan"
+description = "A syntax highlighting plugin based on syntect."
+
+[dependencies]
+serde.workspace = true
+serde_derive.workspace = true
+serde_json.workspace = true
+syntect.workspace = true
+xi-plugin-lib.workspace = true
+xi-core-lib.workspace = true
+xi-rope.workspace = true
+xi-trace.workspace = true
+
+[dev-dependencies]
+toml.workspace = true

@@ -1,0 +1,3 @@
+[submodule "crates/tuan-xi-syntect-plugin/syntect-resources/Packages"]
+	path = crates/tuan-xi-syntect-plugin/syntect-resources/Packages
+	url = https://github.com/sublimehq/Packages

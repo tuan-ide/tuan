@@ -1,6 +1,7 @@
 {
   "conventionalCommits.scopes": [
     "crates/tuan",
-    "crates/tuan-rpc"
+    "crates/tuan-rpc",
+    "crates/tuan-xi-syntect-plugin"
   ]
 }
