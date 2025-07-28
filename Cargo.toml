@@ -5,10 +5,19 @@ publish = false
 
 [workspace]
 resolver = "3"
-members = ["crates/tuan"]
+members = ["crates/tuan", "crates/tuan-rpc"]
 default-members = ["crates/tuan"]
 
 [workspace.dependencies]
 xilem = { git = "https://github.com/linebender/xilem", rev = "5e49206" }
 masonry = { git = "https://github.com/linebender/xilem", rev = "5e49206" }
 winit ={ version = "0.30.0" }
+glib = { version = "0.21.0" }
+log = { version = "0.4.27" }
+pipe = { version = "0.4.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+syntect = { version = "5.2.0" }
+xi-core-lib = { git = "https://github.com/xi-editor/xi-editor" }
+xi-rpc = { git = "https://github.com/xi-editor/xi-editor" }
+tuan-rpc = { path = "crates/tuan-rpc" }
