@@ -56,13 +56,13 @@ fn deserialize_update() {
         operations: vec![
             Operation {
                 operation_type: OperationType::Invalidate,
-                nb_lines: 60,
+                nb_affected_lines: 60,
                 line_num: None,
                 lines: vec![],
             },
             Operation {
                 operation_type: OperationType::Insert,
-                nb_lines: 12,
+                nb_affected_lines: 12,
                 line_num: None,
                 lines: vec![
                     Line {

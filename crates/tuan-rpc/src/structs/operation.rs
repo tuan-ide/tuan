@@ -22,7 +22,7 @@ pub struct Operation {
     #[serde(deserialize_with = "deserialize_operation_type")]
     pub operation_type: OperationType,
     #[serde(rename = "n")]
-    pub nb_lines: u64,
+    pub nb_affected_lines: u64,
     #[serde(rename = "ln")]
     pub line_num: Option<u64>,
     #[serde(default)]
@@ -53,7 +53,7 @@ fn deserialize_operation_from_value() {
     let value = json::json!({"n": 12, "op": "ins"});
     let operation = Operation {
         operation_type: OperationType::Insert,
-        nb_lines: 12,
+        nb_affected_lines: 12,
         line_num: None,
         lines: vec![],
     };
@@ -63,7 +63,7 @@ fn deserialize_operation_from_value() {
     let value = json::json!({"lines":[{"cursor":[0],"styles":[],"text":"foo"},{"styles":[],"text":""}],"n":60,"op":"invalidate"});
     let operation = Operation {
         operation_type: OperationType::Invalidate,
-        nb_lines: 60,
+        nb_affected_lines: 60,
         line_num: None,
         lines: vec![
             Line {
@@ -91,7 +91,7 @@ fn deserialize_operation() {
     let s = r#"{"n": 12, "op": "ins"}"#;
     let operation = Operation {
         operation_type: OperationType::Insert,
-        nb_lines: 12,
+        nb_affected_lines: 12,
         line_num: None,
         lines: vec![],
     };
@@ -101,7 +101,7 @@ fn deserialize_operation() {
     let s = r#"{"lines":[{"cursor":[0],"styles":[],"text":"foo"},{"styles":[],"text":""}],"n":60,"op":"invalidate"}"#;
     let operation = Operation {
         operation_type: OperationType::Invalidate,
-        nb_lines: 60,
+        nb_affected_lines: 60,
         line_num: None,
         lines: vec![
             Line {
@@ -129,7 +129,7 @@ fn deserialize_copy() {
     let operation = Operation {
         operation_type: OperationType::Copy_,
         line_num: Some(3),
-        nb_lines: 1,
+        nb_affected_lines: 1,
         lines: Vec::new(),
     };
 

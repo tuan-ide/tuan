@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::fs;
+use std::sync::{Arc, Mutex};
 
+use log::trace;
 use tuan_rpc::Client;
 use winit::error::EventLoopError;
 use xilem::view::flex_row;
@@ -10,16 +12,36 @@ use xilem::{EventLoop, WidgetView, WindowOptions, Xilem};
 
 use crate::globals::XI_PLUGIN_DIR;
 use crate::globals::{EMBEDDED_PLUGINS, XI_CONFIG_DIR};
+use crate::line_cache::LineCache;
 
 mod globals;
+mod line_cache;
 
-fn app_logic(data: &mut i32) -> impl WidgetView<i32> + use<> {
+struct AppState {
+    line_cache: Arc<Mutex<LineCache>>,
+}
+
+impl AppState {
+    fn new() -> Self {
+        Self {
+            line_cache: Arc::new(Mutex::new(LineCache::new())),
+        }
+    }
+}
+
+fn app_logic(data: &mut AppState) -> impl WidgetView<AppState> + use<> {
     let (client, receiver) = Client::new();
+
+    let line_cache = data.line_cache.clone();
 
     std::thread::spawn(move || {
         loop {
             match receiver.recv() {
                 Ok(operation) => match operation {
+                    tuan_rpc::RpcOperations::Update(update) => {
+                        trace!("Received update: {:?}", update);
+                        line_cache.lock().unwrap().handle_xi_update(update);
+                    }
                     _ => {
                         println!("Received operation: {:?}", operation);
                     }
@@ -81,7 +103,11 @@ fn extract_embedded_plugins() -> Option<String> {
 }
 
 fn main() -> Result<(), EventLoopError> {
-    let app = Xilem::new_simple(0, app_logic, WindowOptions::new("Centered Flex"));
+    let app = Xilem::new_simple(
+        AppState::new(),
+        app_logic,
+        WindowOptions::new("Centered Flex"),
+    );
     app.run_in(EventLoop::with_user_event())?;
     Ok(())
 }
