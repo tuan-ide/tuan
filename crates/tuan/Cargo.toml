@@ -6,7 +6,11 @@ publish.workspace = true
 
 [dependencies]
 xilem.workspace = true
-winit.workspace = true
 masonry.workspace = true
+winit.workspace = true
+glib.workspace = true
 log.workspace = true
 tuan-rpc.workspace = true
+tuan-proxy.workspace = true
+tuan-core.workspace = true
+dirs.workspace = true

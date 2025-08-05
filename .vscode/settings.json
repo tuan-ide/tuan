@@ -1,6 +1,5 @@
 {
   "conventionalCommits.scopes": [
-    "crates/tuan",
-    "crates/tuan-rpc"
+    "crates/tuan"
   ]
 }
