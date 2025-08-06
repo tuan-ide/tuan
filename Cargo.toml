@@ -9,12 +9,18 @@ members = ["crates/tuan"]
 default-members = ["crates/tuan"]
 
 [workspace.dependencies]
+alacritty_terminal = { version = "0.25.0" }
 xilem = { git = "https://github.com/linebender/xilem", rev = "5e49206" }
 masonry = { git = "https://github.com/linebender/xilem", rev = "5e49206" }
 winit ={ version = "0.30.0" }
+crossbeam-channel = { version = "0.5.15" }
 glib = { version = "0.21.0" }
 log = { version = "0.4.27" }
-tuan-rpc = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-rpc" }
-tuan-proxy = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-proxy" }
-tuan-core = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-core" }
+parking_lot = { version = "0.12.4" }
+serde = { version = "1" }
+serde_json = { version = "1" }
+tracing = { version = "0.1.0" }
+tuan-rpc = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-rpc", rev = "e26e06dae6a886cc1f26ea09bdfeff0c1960e240" }
+tuan-proxy = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-proxy", rev = "e26e06dae6a886cc1f26ea09bdfeff0c1960e240" }
+tuan-core = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-core", rev = "e26e06dae6a886cc1f26ea09bdfeff0c1960e240" }
 dirs = { version = "6.0.0" }

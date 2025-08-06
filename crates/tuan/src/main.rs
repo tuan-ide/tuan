@@ -5,6 +5,9 @@ use crate::editor_view::{EditorState, editor_view};
 
 mod editor_view;
 mod globals;
+mod proxy;
+mod terminal;
+mod workspace;
 
 pub struct AppState {
     editor_state: EditorState,
@@ -13,7 +16,9 @@ pub struct AppState {
 impl AppState {
     fn new() -> Self {
         Self {
-            editor_state: EditorState::new(),
+            editor_state: EditorState::new(
+                "/Users/arthurfontaine/Developer/code/local/la-galerie-de-max".into(),
+            ),
         }
     }
 }
