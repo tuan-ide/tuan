@@ -6,16 +6,18 @@ use std::{
 
 use tuan_rpc::{buffer::BufferId, proxy::ProxyResponse};
 
+use super::EditorConfig;
 use crate::{document, proxy, workspace};
 
 #[derive(Clone)]
 pub struct EditorState {
     proxy: proxy::ProxyData,
+    config: Arc<EditorConfig>,
     documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
 }
 
 impl EditorState {
-    pub fn new(workspace_path: PathBuf) -> Self {
+    pub fn new(workspace_path: PathBuf, editor_config: Arc<EditorConfig>) -> Self {
         let workspace = Arc::new(workspace::LapceWorkspace {
             kind: workspace::LapceWorkspaceType::Local,
             path: Some(workspace_path),
@@ -77,6 +79,7 @@ impl EditorState {
 
         Self {
             proxy,
+            config: editor_config,
             documents: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -90,11 +93,12 @@ impl EditorState {
             .proxy_rpc
             .new_buffer(BufferId::next(), path.clone(), {
                 let documents = self.documents.clone();
+                let config = self.config.clone();
                 {
                     move |result| {
                         if let Ok(ProxyResponse::NewBufferResponse { content, read_only }) = result
                         {
-                            let document = document::Document::new(content, read_only);
+                            let document = document::Document::new(content, read_only, config);
                             documents.lock().unwrap().insert(path, document);
                         }
                     }
