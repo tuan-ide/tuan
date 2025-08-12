@@ -1,4 +1,6 @@
-use tuan_core::xi_rope::Rope;
+use std::ops::Range;
+
+use tuan_core::xi_rope::{Rope, rope::Lines};
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
@@ -10,5 +12,9 @@ impl Buffer {
         Self {
             text: Rope::from(content),
         }
+    }
+
+    pub fn get_lines_in_range(&self, range: Range<usize>) -> Lines {
+        self.text.lines(range)
     }
 }
