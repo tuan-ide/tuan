@@ -13,7 +13,8 @@ use crate::{document, proxy, workspace};
 pub struct EditorState {
     proxy: proxy::ProxyData,
     config: Arc<EditorConfig>,
-    documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
+    pub documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
+    pub focused_document_path: Option<PathBuf>,
 }
 
 impl EditorState {
@@ -81,6 +82,7 @@ impl EditorState {
             proxy,
             config: editor_config,
             documents: Arc::new(Mutex::new(HashMap::new())),
+            focused_document_path: None,
         }
     }
 
@@ -104,5 +106,19 @@ impl EditorState {
                     }
                 }
             });
+    }
+
+    pub fn focus_document(&mut self, path: PathBuf) {
+        if self.documents.lock().unwrap().contains_key(&path) {
+            self.focused_document_path = Some(path.clone());
+            println!("Focused document: {:?}", path);
+        } else {
+            println!("Document not found: {:?}", path);
+        }
+    }
+
+    pub fn get_focused_document(&self) -> Option<document::Document> {
+        let focused_path = self.focused_document_path.clone();
+        focused_path.and_then(|path| self.documents.lock().unwrap().get(&path).cloned())
     }
 }

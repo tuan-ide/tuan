@@ -1,4 +1,5 @@
-pub(super) struct Line {
+#[derive(Debug, Clone)]
+pub struct Line {
     content: String,
     line_number: usize,
 }
