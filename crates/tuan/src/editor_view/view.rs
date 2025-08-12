@@ -1,9 +1,17 @@
-use masonry::{accesskit::Role, core::Widget, kurbo::Rect};
+use masonry::{
+    TextAlignOptions,
+    accesskit::Role,
+    core::Widget,
+    kurbo::Rect,
+    parley::{FontFamily, FontStack, GenericFamily, StyleProperty},
+};
 use xilem::{
-    core::{View, ViewMarker}, view::{button, flex}, Pod, ViewCtx, WidgetView
+    Affine, Color, Pod, TextAlign, ViewCtx, WidgetView,
+    core::{View, ViewMarker},
+    view::{button, flex},
 };
 
-use crate::editor_view::EditorState;
+use crate::{document, editor_view::EditorState};
 
 pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
     state.open_file("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
@@ -21,6 +29,40 @@ pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + us
 #[derive(Clone)]
 struct EditorView {
     state: EditorState,
+}
+
+impl EditorView {
+    fn paint_line(
+        line: document::line::Line,
+        ctx: &mut masonry::core::PaintCtx<'_>,
+        scene: &mut masonry::vello::Scene,
+    ) {
+        let text = line.content;
+
+        let (fcx, lcx) = ctx.text_contexts();
+        let mut text_layout_builder = lcx.ranged_builder(fcx, &text, 1.0, true);
+
+        text_layout_builder.push_default(StyleProperty::FontStack(FontStack::Single(
+            FontFamily::Generic(GenericFamily::Monospace),
+        )));
+        text_layout_builder.push_default(StyleProperty::FontSize(14.0));
+
+        let mut text_layout = text_layout_builder.build(&text);
+        text_layout.break_all_lines(None);
+        text_layout.align(None, TextAlign::Start, TextAlignOptions::default());
+
+        let fill_color = Color::from_rgba8(0xFF, 0xFF, 0xFF, 0xFF);
+
+        let transform = Affine::translate((0.0, line.line_number as f64 * 14.0));
+
+        masonry::core::render_text(
+            scene,
+            transform,
+            &text_layout,
+            &[fill_color.into()],
+            true, // hinting
+        );
+    }
 }
 
 impl Widget for EditorView {
@@ -45,10 +87,9 @@ impl Widget for EditorView {
         let document = self.state.get_focused_document();
         if let Some(doc) = document {
             let lines = doc.get_visible_lines(viewport);
-            for (i, line) in lines.enumerate() {
-                let text = format!("{:?}", line);
 
-                println!("render line {}: {}", i, text);
+            for line in lines {
+                EditorView::paint_line(line, ctx, scene);
             }
         }
     }

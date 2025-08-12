@@ -1,7 +1,7 @@
 #[derive(Debug, Clone)]
 pub struct Line {
-    content: String,
-    line_number: usize,
+    pub content: String,
+    pub line_number: usize,
 }
 
 impl Line {

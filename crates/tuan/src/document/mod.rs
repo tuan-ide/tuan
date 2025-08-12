@@ -1,5 +1,5 @@
 mod document;
-mod line;
+pub mod line;
 mod buffer;
 
 pub use document::*;
