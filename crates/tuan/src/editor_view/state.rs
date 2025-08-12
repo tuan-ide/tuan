@@ -12,7 +12,7 @@ use crate::{document, proxy, workspace};
 #[derive(Clone)]
 pub struct EditorState {
     proxy: proxy::ProxyData,
-    config: Arc<EditorConfig>,
+    pub config: Arc<EditorConfig>,
     pub documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
     pub focused_document_path: Option<PathBuf>,
 }

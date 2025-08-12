@@ -20,8 +20,10 @@ impl Document {
     }
 
     pub fn get_visible_lines(&self, viewport: Rect) -> impl Iterator<Item = line::Line> {
-        let min_line = (viewport.y0 / self.config.line_height as f64).floor() as usize;
-        let max_line = (viewport.y1 / self.config.line_height as f64).ceil() as usize;
+        let line_height = self.config.real_line_height();
+
+        let min_line = (viewport.y0 / line_height as f64).floor() as usize;
+        let max_line = (viewport.y1 / line_height as f64).ceil() as usize;
 
         let lines = self.buffer.get_lines_in_range(min_line..max_line);
 

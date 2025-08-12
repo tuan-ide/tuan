@@ -33,11 +33,14 @@ struct EditorView {
 
 impl EditorView {
     fn paint_line(
+        &self,
         line: document::line::Line,
         ctx: &mut masonry::core::PaintCtx<'_>,
         scene: &mut masonry::vello::Scene,
     ) {
         let text = line.content;
+        let font_size = self.state.config.font_size;
+        let line_height = self.state.config.real_line_height();
 
         let (fcx, lcx) = ctx.text_contexts();
         let mut text_layout_builder = lcx.ranged_builder(fcx, &text, 1.0, true);
@@ -45,7 +48,7 @@ impl EditorView {
         text_layout_builder.push_default(StyleProperty::FontStack(FontStack::Single(
             FontFamily::Generic(GenericFamily::Monospace),
         )));
-        text_layout_builder.push_default(StyleProperty::FontSize(14.0));
+        text_layout_builder.push_default(StyleProperty::FontSize(font_size));
 
         let mut text_layout = text_layout_builder.build(&text);
         text_layout.break_all_lines(None);
@@ -53,7 +56,7 @@ impl EditorView {
 
         let fill_color = Color::from_rgba8(0xFF, 0xFF, 0xFF, 0xFF);
 
-        let transform = Affine::translate((0.0, line.line_number as f64 * 14.0));
+        let transform = Affine::translate((0.0, line.line_number as f64 * line_height as f64));
 
         masonry::core::render_text(
             scene,
@@ -89,7 +92,7 @@ impl Widget for EditorView {
             let lines = doc.get_visible_lines(viewport);
 
             for line in lines {
-                EditorView::paint_line(line, ctx, scene);
+                self.paint_line(line, ctx, scene);
             }
         }
     }
