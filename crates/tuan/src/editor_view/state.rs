@@ -1,10 +1,17 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
-use crate::{proxy, workspace};
+use tuan_rpc::{buffer::BufferId, proxy::ProxyResponse};
+
+use crate::{document, proxy, workspace};
 
 #[derive(Clone)]
 pub struct EditorState {
     proxy: proxy::ProxyData,
+    documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
 }
 
 impl EditorState {
@@ -68,6 +75,30 @@ impl EditorState {
             }
         });
 
-        Self { proxy }
+        Self {
+            proxy,
+            documents: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    pub fn open_file(&self, path: PathBuf) {
+        if let Some(document) = self.documents.lock().unwrap().get(&path) {
+            return;
+        }
+
+        self.proxy
+            .proxy_rpc
+            .new_buffer(BufferId::next(), path.clone(), {
+                let documents = self.documents.clone();
+                {
+                    move |result| {
+                        if let Ok(ProxyResponse::NewBufferResponse { content, read_only }) = result
+                        {
+                            let document = document::Document::new(content, read_only);
+                            documents.lock().unwrap().insert(path, document);
+                        }
+                    }
+                }
+            });
     }
 }

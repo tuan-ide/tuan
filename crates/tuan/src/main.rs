@@ -8,6 +8,8 @@ mod globals;
 mod proxy;
 mod terminal;
 mod workspace;
+mod document;
+mod buffer;
 
 pub struct AppState {
     editor_state: EditorState,
@@ -17,7 +19,7 @@ impl AppState {
     fn new() -> Self {
         Self {
             editor_state: EditorState::new(
-                "/Users/arthurfontaine/Developer/code/local/la-galerie-de-max".into(),
+                "/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie".into(),
             ),
         }
     }
