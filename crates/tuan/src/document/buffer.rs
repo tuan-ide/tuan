@@ -1,6 +1,6 @@
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
-use tuan_core::xi_rope::{Rope, rope::Lines};
+use tuan_core::xi_rope::Rope;
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
@@ -14,7 +14,7 @@ impl Buffer {
         }
     }
 
-    pub fn get_lines_in_range(&self, range: Range<usize>) -> Lines {
-        self.text.lines(range)
+    pub fn get_lines_in_range(&self, range: Range<usize>) -> impl Iterator<Item = Cow<'_, str>> {
+        self.text.lines(..).skip(range.start).take(range.end - range.start)
     }
 }
