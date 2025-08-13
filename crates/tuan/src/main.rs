@@ -11,6 +11,7 @@ mod globals;
 mod proxy;
 mod terminal;
 mod workspace;
+mod theme;
 
 pub struct AppState {
     editor_state: EditorState,

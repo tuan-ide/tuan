@@ -20,3 +20,4 @@ tuan-rpc.workspace = true
 tuan-proxy.workspace = true
 tuan-core.workspace = true
 dirs.workspace = true
+hex_color.workspace = true

@@ -24,3 +24,4 @@ tuan-rpc = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-rp
 tuan-proxy = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-proxy", rev = "e26e06dae6a886cc1f26ea09bdfeff0c1960e240" }
 tuan-core = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-core", rev = "e26e06dae6a886cc1f26ea09bdfeff0c1960e240" }
 dirs = { version = "6.0.0" }
+hex_color = { version = "3.0.0" }

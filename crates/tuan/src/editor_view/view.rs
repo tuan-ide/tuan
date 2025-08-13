@@ -1,17 +1,22 @@
+use hex_color::HexColor;
 use masonry::{
     TextAlignOptions,
     accesskit::Role,
-    core::Widget,
+    core::{BrushIndex, Widget},
     kurbo::Rect,
-    parley::{FontFamily, FontStack, GenericFamily, StyleProperty},
+    parley::{FontFamily, FontStack, FontStyle, GenericFamily, StyleProperty},
+    peniko::Brush,
 };
 use xilem::{
-    Affine, Color, Pod, TextAlign, ViewCtx, WidgetView,
+    Affine, Color, FontWeight, Pod, TextAlign, ViewCtx, WidgetView,
     core::{View, ViewMarker},
     view::{button, flex},
 };
 
-use crate::{document, editor_view::EditorState};
+use crate::{
+    document::{self, RangeStyle},
+    editor_view::EditorState,
+};
 
 pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
     state.open_file("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
@@ -35,12 +40,17 @@ impl EditorView {
     fn paint_line(
         &self,
         line: document::line::Line,
+        document: &document::Document,
         ctx: &mut masonry::core::PaintCtx<'_>,
         scene: &mut masonry::vello::Scene,
     ) {
         let text = line.content;
         let font_size = self.state.config.font_size;
         let line_height = self.state.config.real_line_height();
+
+        let styles = document
+            .get_styles_in_range(line.start, line.end)
+            .collect::<Vec<_>>();
 
         let (fcx, lcx) = ctx.text_contexts();
         let mut text_layout_builder = lcx.ranged_builder(fcx, &text, 1.0, true);
@@ -50,11 +60,38 @@ impl EditorView {
         )));
         text_layout_builder.push_default(StyleProperty::FontSize(font_size));
 
+        let mut brushes: Vec<Brush> = vec![];
+        for style in styles {
+            let range = (style.start - line.start)..(style.end - line.start);
+            let style = style.style.clone();
+
+            if style.italic {
+                text_layout_builder
+                    .push(StyleProperty::FontStyle(FontStyle::Italic), range.clone());
+            }
+            if style.bold {
+                text_layout_builder
+                    .push(StyleProperty::FontWeight(FontWeight::BOLD), range.clone());
+            }
+            if style.underline {
+                text_layout_builder.push(StyleProperty::Underline(true), range.clone());
+            }
+            if style.strikethrough {
+                text_layout_builder.push(StyleProperty::Strikethrough(true), range.clone());
+            }
+            if let Some(color) = style.foreground {
+                let color = HexColor::parse(&color).expect("Failed to parse color");
+                brushes.push(Color::from_rgba8(color.r, color.g, color.b, color.a).into());
+
+                let brush_index = BrushIndex(brushes.len() - 1);
+
+                text_layout_builder.push(StyleProperty::Brush(brush_index), range.clone());
+            }
+        }
+
         let mut text_layout = text_layout_builder.build(&text);
         text_layout.break_all_lines(None);
         text_layout.align(None, TextAlign::Start, TextAlignOptions::default());
-
-        let fill_color = Color::from_rgba8(0xFF, 0xFF, 0xFF, 0xFF);
 
         let transform = Affine::translate((0.0, line.line_number as f64 * line_height as f64));
 
@@ -62,7 +99,7 @@ impl EditorView {
             scene,
             transform,
             &text_layout,
-            &[fill_color.into()],
+            &brushes,
             true, // hinting
         );
     }
@@ -88,13 +125,12 @@ impl Widget for EditorView {
         let viewport = Rect::new(0.0, 0.0, size.width, size.height);
 
         let document = self.state.get_focused_document();
-        if let Some(document) = document {
-            let styles = document.get_styles();
-            println!("Styles heho: {:?}", styles);
+        if let Some(mut document) = document {
+            document.update_styles_with_syntax();
             let lines = document.get_visible_lines(viewport);
 
             for line in lines {
-                self.paint_line(line, ctx, scene);
+                self.paint_line(line, &document, ctx, scene);
             }
         }
     }

@@ -1,18 +1,27 @@
 use std::{path::PathBuf, sync::Arc};
 
 use masonry::kurbo::Rect;
-use tuan_core::{syntax::Syntax, xi_rope::{spans::SpansInfo, tree::Node}};
-use tuan_rpc::style::Style;
+use tuan_core::syntax::Syntax;
 
 use super::{buffer, line};
-use crate::editor_view;
+use crate::{
+    editor_view,
+    theme::{self, theme::Theme as _},
+};
+
+#[derive(Debug, Clone)]
+pub struct RangeStyle {
+    pub start: usize,
+    pub end: usize,
+    pub style: theme::Style,
+}
 
 #[derive(Debug, Clone)]
 pub struct Document {
     path: PathBuf,
     buffer: buffer::Buffer,
     config: Arc<editor_view::EditorConfig>,
-    styles: Option<Node<SpansInfo<Style>>>,
+    styles: Vec<RangeStyle>,
 }
 
 impl Document {
@@ -26,7 +35,7 @@ impl Document {
             path,
             buffer: buffer::Buffer::new(content, read_only),
             config,
-            styles: None,
+            styles: Vec::new(),
         }
     }
 
@@ -36,18 +45,40 @@ impl Document {
         let min_line = (viewport.y0 / line_height as f64).floor() as usize;
         let max_line = (viewport.y1 / line_height as f64).ceil() as usize;
 
-        let lines = self.buffer.get_lines_in_range(min_line..max_line);
-
-        line::Line::from_iter(lines, min_line)
+        self.buffer.get_lines_in_range(min_line..max_line)
     }
 
-    pub fn get_styles(&self) -> Option<Node<SpansInfo<Style>>> {
-        self.styles.clone()
+    pub fn get_styles_in_range(&self, start: usize, end: usize) -> impl Iterator<Item = &RangeStyle> {
+        self.styles
+            .iter()
+            .filter(move |style| style.start < end && style.end > start)
     }
 
     pub fn update_styles_with_syntax(&mut self) {
         let mut syntax = Syntax::init(&self.path);
         syntax.parse(1, self.buffer.text.clone(), None);
-        self.styles = syntax.styles;
+        self.styles = if let Some(syntax_styles) = syntax.styles {
+            syntax_styles
+                .iter()
+                .map(|(interval, style)| {
+                    style
+                        .fg_color
+                        .as_ref()
+                        .and_then(|fg_color| match &self.config.theme {
+                            theme::Theme::Vscode(vscode_theme) => {
+                                vscode_theme.get_style(vec![fg_color])
+                            }
+                        })
+                        .map(|style| RangeStyle {
+                            start: interval.start,
+                            end: interval.end,
+                            style,
+                        })
+                })
+                .flatten()
+                .collect()
+        } else {
+            Vec::new()
+        };
     }
 }
