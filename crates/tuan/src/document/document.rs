@@ -1,21 +1,32 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use masonry::kurbo::Rect;
+use tuan_core::{syntax::Syntax, xi_rope::{spans::SpansInfo, tree::Node}};
+use tuan_rpc::style::Style;
 
-use super::{line, buffer};
-use crate::{editor_view};
+use super::{buffer, line};
+use crate::editor_view;
 
 #[derive(Debug, Clone)]
 pub struct Document {
+    path: PathBuf,
     buffer: buffer::Buffer,
     config: Arc<editor_view::EditorConfig>,
+    styles: Option<Node<SpansInfo<Style>>>,
 }
 
 impl Document {
-    pub fn new(content: String, read_only: bool, config: Arc<editor_view::EditorConfig>) -> Self {
+    pub fn new(
+        path: PathBuf,
+        content: String,
+        read_only: bool,
+        config: Arc<editor_view::EditorConfig>,
+    ) -> Self {
         Self {
+            path,
             buffer: buffer::Buffer::new(content, read_only),
             config,
+            styles: None,
         }
     }
 
@@ -28,5 +39,15 @@ impl Document {
         let lines = self.buffer.get_lines_in_range(min_line..max_line);
 
         line::Line::from_iter(lines, min_line)
+    }
+
+    pub fn get_styles(&self) -> Option<Node<SpansInfo<Style>>> {
+        self.styles.clone()
+    }
+
+    pub fn update_styles_with_syntax(&mut self) {
+        let mut syntax = Syntax::init(&self.path);
+        syntax.parse(1, self.buffer.text.clone(), None);
+        self.styles = syntax.styles;
     }
 }

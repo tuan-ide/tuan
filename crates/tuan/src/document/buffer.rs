@@ -4,7 +4,7 @@ use tuan_core::xi_rope::Rope;
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
-    text: Rope,
+    pub(super) text: Rope,
 }
 
 impl Buffer {

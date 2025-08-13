@@ -88,8 +88,10 @@ impl Widget for EditorView {
         let viewport = Rect::new(0.0, 0.0, size.width, size.height);
 
         let document = self.state.get_focused_document();
-        if let Some(doc) = document {
-            let lines = doc.get_visible_lines(viewport);
+        if let Some(document) = document {
+            let styles = document.get_styles();
+            println!("Styles heho: {:?}", styles);
+            let lines = document.get_visible_lines(viewport);
 
             for line in lines {
                 self.paint_line(line, ctx, scene);
@@ -138,10 +140,8 @@ impl<State, Action> View<State, Action, ViewCtx> for EditorView {
         mut element: xilem::core::Mut<Self::Element>,
         app_state: &mut State,
     ) {
-        if prev.state.focused_document_path != self.state.focused_document_path {
-            *element.widget = self.clone();
-            element.ctx.request_render();
-        }
+        *element.widget = self.clone();
+        element.ctx.request_render();
     }
 
     fn teardown(

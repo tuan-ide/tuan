@@ -62,19 +62,19 @@ impl EditorState {
             let proxy_rpc = proxy.proxy_rpc.clone();
             let proxy_rx = proxy_rpc.rx().clone();
             move || {
-                while let Ok(notification) = proxy_rx.recv() {
-                    match notification {
-                        tuan_rpc::proxy::ProxyRpc::Request(id, req) => {
-                            println!("ProxyRpc::Request - id: {:?}, req: {:?}", id, req);
-                        }
-                        tuan_rpc::proxy::ProxyRpc::Notification(notif) => {
-                            println!("ProxyRpc::Notification - notif: {:?}", notif);
-                        }
-                        tuan_rpc::proxy::ProxyRpc::Shutdown => {
-                            println!("ProxyRpc::Shutdown");
-                        }
-                    }
-                }
+                // while let Ok(notification) = proxy_rx.recv() {
+                //     match notification {
+                //         tuan_rpc::proxy::ProxyRpc::Request(id, req) => {
+                //             println!("ProxyRpc::Request - id: {:?}, req: {:?}", id, req);
+                //         }
+                //         tuan_rpc::proxy::ProxyRpc::Notification(notif) => {
+                //             println!("ProxyRpc::Notification - notif: {:?}", notif);
+                //         }
+                //         tuan_rpc::proxy::ProxyRpc::Shutdown => {
+                //             println!("ProxyRpc::Shutdown");
+                //         }
+                //     }
+                // }
             }
         });
 
@@ -96,16 +96,34 @@ impl EditorState {
             .new_buffer(BufferId::next(), path.clone(), {
                 let documents = self.documents.clone();
                 let config = self.config.clone();
+                let path = path.clone();
                 {
                     move |result| {
                         if let Ok(ProxyResponse::NewBufferResponse { content, read_only }) = result
                         {
-                            let document = document::Document::new(content, read_only, config);
-                            documents.lock().unwrap().insert(path, document);
+                            let document =
+                                document::Document::new(path.clone(), content, read_only, config);
+                            documents.lock().unwrap().insert(path.clone(), document);
+
+                            Self::update_styles_with_syntax(documents, path);
                         }
                     }
                 }
             });
+    }
+
+    fn update_styles_with_syntax(
+        documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
+        path: PathBuf,
+    ) {
+        std::thread::spawn(move || {
+            let mut docs = documents.lock().unwrap();
+            if let Some(document) = docs.get_mut(&path) {
+                document.update_styles_with_syntax();
+            } else {
+                println!("Document not found for path: {:?}", path);
+            }
+        });
     }
 
     pub fn focus_document(&mut self, path: PathBuf) {
