@@ -9,12 +9,13 @@ use tuan_rpc::{buffer::BufferId, proxy::ProxyResponse};
 use super::EditorConfig;
 use crate::{document, proxy, workspace};
 
-#[derive(Clone)]
 pub struct EditorState {
+    pub initialized: bool,
     proxy: proxy::ProxyData,
     pub config: Arc<EditorConfig>,
     pub documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
     pub focused_document_path: Option<PathBuf>,
+    pub document_scrollings: HashMap<PathBuf, (f64, f64)>,
 }
 
 impl EditorState {
@@ -79,10 +80,12 @@ impl EditorState {
         });
 
         Self {
+            initialized: true,
             proxy,
             config: editor_config,
             documents: Arc::new(Mutex::new(HashMap::new())),
             focused_document_path: None,
+            document_scrollings: HashMap::new(),
         }
     }
 
@@ -138,5 +141,28 @@ impl EditorState {
     pub fn get_focused_document(&self) -> Option<document::Document> {
         let focused_path = self.focused_document_path.clone();
         focused_path.and_then(|path| self.documents.lock().unwrap().get(&path).cloned())
+    }
+
+    pub fn scroll_focused_document(&mut self, delta: (f64, f64)) {
+        if let Some(focused_path) = &self.focused_document_path {
+            let (x, y) = self
+                .document_scrollings
+                .entry(focused_path.clone())
+                .or_insert((0.0, 0.0));
+            *x += delta.0;
+            *y += delta.1;
+        } else {
+            println!("No focused document to scroll");
+        }
+    }
+
+    pub fn get_document_scroll(&self, path: &PathBuf) -> Option<(f64, f64)> {
+        self.document_scrollings.get(path).cloned()
+    }
+
+    pub fn get_focused_document_scroll(&self) -> Option<(f64, f64)> {
+        self.focused_document_path
+            .as_ref()
+            .and_then(|path| self.get_document_scroll(path))
     }
 }

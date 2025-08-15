@@ -2,7 +2,7 @@ use hex_color::HexColor;
 use masonry::{
     TextAlignOptions,
     accesskit::Role,
-    core::{BrushIndex, Widget},
+    core::{BrushIndex, ScrollDelta, Widget},
     kurbo::Rect,
     parley::{FontFamily, FontStack, FontStyle, GenericFamily, StyleProperty},
     peniko::Brush,
@@ -13,10 +13,7 @@ use xilem::{
     view::{button, flex},
 };
 
-use crate::{
-    document::{self, RangeStyle},
-    editor_view::EditorState,
-};
+use crate::{document, editor_view::EditorState};
 
 pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
     state.open_file("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
@@ -25,28 +22,28 @@ pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + us
         button("Open File", |state: &mut EditorState| {
             state.focus_document("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
         }),
-        EditorView {
-            state: state.clone(),
-        },
+        EditorView,
     ))
 }
 
-#[derive(Clone)]
-struct EditorView {
-    state: EditorState,
+struct EditorPortal {
+    state: *mut EditorState, // TODO: Try with Arc or Rc
 }
 
-impl EditorView {
+impl EditorPortal {
     fn paint_line(
-        &self,
+        &mut self,
         line: document::line::Line,
         document: &document::Document,
         ctx: &mut masonry::core::PaintCtx<'_>,
         scene: &mut masonry::vello::Scene,
+        scroll_delta: (f64, f64),
     ) {
         let text = line.content;
-        let font_size = self.state.config.font_size;
-        let line_height = self.state.config.real_line_height();
+        let font_size = self.with_state(|state| state.config.font_size).unwrap();
+        let line_height = self
+            .with_state(|state| state.config.real_line_height())
+            .unwrap();
 
         let styles = document
             .get_styles_in_range(line.start, line.end)
@@ -93,7 +90,10 @@ impl EditorView {
         text_layout.break_all_lines(None);
         text_layout.align(None, TextAlign::Start, TextAlignOptions::default());
 
-        let transform = Affine::translate((0.0, line.line_number as f64 * line_height as f64));
+        let transform = Affine::translate((
+            scroll_delta.0,
+            (scroll_delta.1) + (line.line_number as f64 * line_height as f64),
+        ));
 
         masonry::core::render_text(
             scene,
@@ -103,9 +103,27 @@ impl EditorView {
             true, // hinting
         );
     }
+
+    fn with_state<F, R>(&mut self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut EditorState) -> R,
+    {
+        if self.state.is_null() {
+            return None;
+        }
+
+        unsafe {
+            let state = &mut *self.state;
+            if !state.initialized {
+                println!("EditorState is not initialized");
+                return None;
+            }
+            Some(f(state))
+        }
+    }
 }
 
-impl Widget for EditorView {
+impl Widget for EditorPortal {
     fn layout(
         &mut self,
         _ctx: &mut masonry::core::LayoutCtx<'_>,
@@ -122,15 +140,27 @@ impl Widget for EditorView {
         scene: &mut masonry::vello::Scene,
     ) {
         let size = ctx.size();
-        let viewport = Rect::new(0.0, 0.0, size.width, size.height);
+        let scroll_delta = self
+            .with_state(|state| state.get_focused_document_scroll())
+            .flatten()
+            .unwrap_or((0.0, 0.0));
+        let viewport = Rect::new(
+            -scroll_delta.0,
+            -scroll_delta.1,
+            size.width - scroll_delta.0,
+            size.height - scroll_delta.1,
+        );
 
-        let document = self.state.get_focused_document();
+        let document = self
+            .with_state(|state| state.get_focused_document())
+            .flatten();
+
         if let Some(mut document) = document {
             document.update_styles_with_syntax();
             let lines = document.get_visible_lines(viewport);
 
             for line in lines {
-                self.paint_line(line, &document, ctx, scene);
+                self.paint_line(line, &document, ctx, scene, scroll_delta);
             }
         }
     }
@@ -156,16 +186,43 @@ impl Widget for EditorView {
         // TODO
         masonry::core::ChildrenIds::new()
     }
+
+    fn on_pointer_event(
+        &mut self,
+        ctx: &mut masonry::core::EventCtx<'_>,
+        props: &mut masonry::core::PropertiesMut<'_>,
+        event: &masonry::core::PointerEvent,
+    ) {
+        match event {
+            masonry::core::PointerEvent::Scroll {
+                pointer,
+                delta,
+                state,
+            } => {
+                if let ScrollDelta::PixelDelta(delta) = delta {
+                    self.with_state(|state| {
+                        state.scroll_focused_document((delta.x, delta.y));
+                    });
+                    ctx.request_render();
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
+struct EditorView;
 impl ViewMarker for EditorView {}
-
-impl<State, Action> View<State, Action, ViewCtx> for EditorView {
-    type Element = Pod<EditorView>;
+impl View<EditorState, (), ViewCtx> for EditorView {
+    type Element = Pod<EditorPortal>;
     type ViewState = ();
 
-    fn build(&self, ctx: &mut ViewCtx, app_state: &mut State) -> (Self::Element, Self::ViewState) {
-        (Pod::new(self.clone()), ())
+    fn build(
+        &self,
+        ctx: &mut ViewCtx,
+        app_state: &mut EditorState,
+    ) -> (Self::Element, Self::ViewState) {
+        (Pod::new(EditorPortal { state: app_state }), ())
     }
 
     fn rebuild(
@@ -174,9 +231,9 @@ impl<State, Action> View<State, Action, ViewCtx> for EditorView {
         view_state: &mut Self::ViewState,
         ctx: &mut ViewCtx,
         mut element: xilem::core::Mut<Self::Element>,
-        app_state: &mut State,
+        app_state: &mut EditorState,
     ) {
-        *element.widget = self.clone();
+        *element.widget = EditorPortal { state: app_state };
         element.ctx.request_render();
     }
 
@@ -185,7 +242,7 @@ impl<State, Action> View<State, Action, ViewCtx> for EditorView {
         view_state: &mut Self::ViewState,
         ctx: &mut ViewCtx,
         element: xilem::core::Mut<'_, Self::Element>,
-        app_state: &mut State,
+        app_state: &mut EditorState,
     ) {
         ctx.teardown_leaf(element);
     }
@@ -195,8 +252,8 @@ impl<State, Action> View<State, Action, ViewCtx> for EditorView {
         view_state: &mut Self::ViewState,
         id_path: &[xilem::core::ViewId],
         message: xilem::core::DynMessage,
-        app_state: &mut State,
-    ) -> xilem::core::MessageResult<Action> {
+        app_state: &mut EditorState,
+    ) -> xilem::core::MessageResult<()> {
         debug_assert!(
             !id_path.is_empty(),
             "id path should be non-empty in GameView::message"
