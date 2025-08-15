@@ -1,19 +1,16 @@
-use hex_color::HexColor;
+use super::line::Line;
+use crate::editor_view::EditorState;
 use masonry::{
-    TextAlignOptions,
     accesskit::Role,
-    core::{BrushIndex, ScrollDelta, Widget},
+    core::{ScrollDelta, Widget},
     kurbo::Rect,
-    parley::{FontFamily, FontStack, FontStyle, GenericFamily, StyleProperty},
-    peniko::Brush,
 };
+use winit::dpi::LogicalPosition;
 use xilem::{
-    Affine, Color, FontWeight, Pod, TextAlign, ViewCtx, WidgetView,
+    Pod, ViewCtx, WidgetView,
     core::{View, ViewMarker},
     view::{button, flex},
 };
-
-use crate::{document, editor_view::EditorState};
 
 pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
     state.open_file("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
@@ -28,80 +25,15 @@ pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + us
 
 struct EditorPortal {
     state: *mut EditorState, // TODO: Try with Arc or Rc
+    y_to_line_mapping: Vec<(f64, f64, Line)>,
 }
 
 impl EditorPortal {
-    fn paint_line(
-        &mut self,
-        line: document::line::Line,
-        document: &document::Document,
-        ctx: &mut masonry::core::PaintCtx<'_>,
-        scene: &mut masonry::vello::Scene,
-        scroll_delta: (f64, f64),
-    ) {
-        let text = line.content;
-        let font_size = self.with_state(|state| state.config.font_size).unwrap();
-        let line_height = self
-            .with_state(|state| state.config.real_line_height())
-            .unwrap();
-
-        let styles = document
-            .get_styles_in_range(line.start, line.end)
-            .collect::<Vec<_>>();
-
-        let (fcx, lcx) = ctx.text_contexts();
-        let mut text_layout_builder = lcx.ranged_builder(fcx, &text, 1.0, true);
-
-        text_layout_builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Generic(GenericFamily::Monospace),
-        )));
-        text_layout_builder.push_default(StyleProperty::FontSize(font_size));
-
-        let mut brushes: Vec<Brush> = vec![];
-        for style in styles {
-            let range = (style.start - line.start)..(style.end - line.start);
-            let style = style.style.clone();
-
-            if style.italic {
-                text_layout_builder
-                    .push(StyleProperty::FontStyle(FontStyle::Italic), range.clone());
-            }
-            if style.bold {
-                text_layout_builder
-                    .push(StyleProperty::FontWeight(FontWeight::BOLD), range.clone());
-            }
-            if style.underline {
-                text_layout_builder.push(StyleProperty::Underline(true), range.clone());
-            }
-            if style.strikethrough {
-                text_layout_builder.push(StyleProperty::Strikethrough(true), range.clone());
-            }
-            if let Some(color) = style.foreground {
-                let color = HexColor::parse(&color).expect("Failed to parse color");
-                brushes.push(Color::from_rgba8(color.r, color.g, color.b, color.a).into());
-
-                let brush_index = BrushIndex(brushes.len() - 1);
-
-                text_layout_builder.push(StyleProperty::Brush(brush_index), range.clone());
-            }
+    fn new(state: *mut EditorState) -> Self {
+        Self {
+            state,
+            y_to_line_mapping: Vec::new(),
         }
-
-        let mut text_layout = text_layout_builder.build(&text);
-        text_layout.break_all_lines(None);
-        text_layout.align(None, TextAlign::Start, TextAlignOptions::default());
-
-        let transform = Affine::translate((
-            scroll_delta.0,
-            (scroll_delta.1) + (line.line_number as f64 * line_height as f64),
-        ));
-
-        masonry::core::render_text(
-            scene,
-            transform,
-            &text_layout,
-            &brushes,
-            true, // hinting
-        );
     }
 
     fn with_state<F, R>(&mut self, f: F) -> Option<R>
@@ -157,10 +89,14 @@ impl Widget for EditorPortal {
 
         if let Some(mut document) = document {
             document.update_styles_with_syntax();
+            self.y_to_line_mapping.clear();
             let lines = document.get_visible_lines(viewport);
 
+            let config = self.with_state(|state| state.config.clone()).unwrap();
             for line in lines {
-                self.paint_line(line, &document, ctx, scene, scroll_delta);
+                let line = Line::new(&config, &line, &document, ctx);
+                let (y_min, y_max) = line.paint_line(scene, scroll_delta);
+                self.y_to_line_mapping.push((y_min, y_max, line));
             }
         }
     }
@@ -206,6 +142,45 @@ impl Widget for EditorPortal {
                     ctx.request_render();
                 }
             }
+            masonry::core::PointerEvent::Down {
+                pointer,
+                button,
+                state,
+            } => {
+                let scroll_delta = self
+                    .with_state(|state| state.get_focused_document_scroll())
+                    .flatten()
+                    .unwrap_or((0.0, 0.0));
+
+                let position: LogicalPosition<f64> =
+                    state.position.to_logical(ctx.get_scale_factor());
+
+                let x = position.x - ctx.paint_rect().x0 - scroll_delta.0;
+                let y = position.y - ctx.paint_rect().y0 - scroll_delta.1;
+
+                let line = self
+                    .y_to_line_mapping
+                    .iter()
+                    .find(|(y_min, y_max, _)| *y_min <= y && y <= *y_max)
+                    .map(|(_, _, line)| line);
+
+                let char_index = line
+                    .map(|line| line.get_clicked_character_index(x as f32))
+                    .flatten();
+
+                line.map(|line| println!("Clicked line: {:?}", line.line))
+                    .unwrap_or_else(|| {
+                        println!("No line found at position: ({}, {})", x, y);
+                    });
+
+                println!("Clicked character index: {:?}", char_index);
+                println!(
+                    "Clicked character: {:?}",
+                    line.and_then(|l| {
+                        char_index.and_then(|index| l.line.content.chars().nth(index))
+                    })
+                );
+            }
             _ => {}
         }
     }
@@ -222,7 +197,7 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         ctx: &mut ViewCtx,
         app_state: &mut EditorState,
     ) -> (Self::Element, Self::ViewState) {
-        (Pod::new(EditorPortal { state: app_state }), ())
+        (Pod::new(EditorPortal::new(app_state)), ())
     }
 
     fn rebuild(
@@ -233,7 +208,7 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         mut element: xilem::core::Mut<Self::Element>,
         app_state: &mut EditorState,
     ) {
-        *element.widget = EditorPortal { state: app_state };
+        *element.widget = EditorPortal::new(app_state);
         element.ctx.request_render();
     }
 
