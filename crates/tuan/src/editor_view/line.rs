@@ -8,11 +8,13 @@ use masonry::{
     },
     peniko::Brush,
 };
-use xilem::{Affine, Color, FontWeight, TextAlign};
+use xilem::{Affine, FontWeight, TextAlign};
 
+#[derive(Clone)]
 pub(super) struct Line {
     editor_config: EditorConfig,
-    x_to_character_index_mapping: Vec<(f32, f32, usize)>, // (start, end, index)
+    /// (start, end, index)
+    x_to_character_index_mapping: Vec<(f32, f32, usize)>,
     text_layout: masonry::parley::Layout<BrushIndex>,
     brushes: Vec<Brush>,
     pub(super) line: document::line::Line,
@@ -25,19 +27,19 @@ impl Line {
         document: &document::Document,
         paint_ctx: &mut masonry::core::PaintCtx<'_>,
     ) -> Self {
-        let (text_layout, brushes, range_index_mapping) =
-            Self::get_line_text_layout(&config, line, document, paint_ctx);
+        let (text_layout, brushes, x_to_character_index_mapping) =
+            Self::get_text_layout(&config, line, document, paint_ctx);
 
         Self {
             editor_config: config.clone(),
-            x_to_character_index_mapping: range_index_mapping,
+            x_to_character_index_mapping,
             text_layout,
             brushes,
             line: line.clone(),
         }
     }
 
-    fn get_line_text_layout(
+    fn get_text_layout(
         editor_config: &EditorConfig,
         line: &document::line::Line,
         document: &document::Document,
@@ -81,8 +83,7 @@ impl Line {
                 text_layout_builder.push(StyleProperty::Strikethrough(true), range.clone());
             }
             if let Some(color) = style.foreground {
-                let color = HexColor::parse(&color).expect("Failed to parse color");
-                brushes.push(Color::from_rgba8(color.r, color.g, color.b, color.a).into());
+                brushes.push(color.into());
 
                 let brush_index = BrushIndex(brushes.len() - 1);
 
@@ -94,7 +95,7 @@ impl Line {
         text_layout.break_all_lines(None);
         text_layout.align(None, TextAlign::Start, TextAlignOptions::default());
 
-        let mut range_index_mapping = Vec::new();
+        let mut x_to_character_index_mapping = Vec::new();
         if let Some(line) = text_layout.lines().next() {
             let mut character_index = 0;
             let mut x = 0.0;
@@ -104,7 +105,7 @@ impl Line {
                     for glyph in glyph_run.glyphs() {
                         let new_x = x + glyph.advance;
 
-                        range_index_mapping.push((x, new_x, character_index));
+                        x_to_character_index_mapping.push((x, new_x, character_index));
 
                         character_index += 1;
                         x = new_x;
@@ -113,10 +114,10 @@ impl Line {
             }
         }
 
-        (text_layout, brushes, range_index_mapping)
+        (text_layout, brushes, x_to_character_index_mapping)
     }
 
-    pub(super) fn paint_line(
+    pub(super) fn paint(
         &self,
         scene: &mut masonry::vello::Scene,
         scroll_delta: (f64, f64),
@@ -149,5 +150,11 @@ impl Line {
             }
         }
         None
+    }
+
+    pub fn get_x_range_for_index(&self, index: usize) -> Option<(f32, f32)> {
+        self.x_to_character_index_mapping
+            .get(index)
+            .map(|(start, end, _)| (*start, *end))
     }
 }

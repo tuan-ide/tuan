@@ -9,7 +9,8 @@ use winit::dpi::LogicalPosition;
 use xilem::{
     Pod, ViewCtx, WidgetView,
     core::{View, ViewMarker},
-    view::{button, flex},
+    tokio,
+    view::{button, flex, task},
 };
 
 pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
@@ -93,10 +94,23 @@ impl Widget for EditorPortal {
             let lines = document.get_visible_lines(viewport);
 
             let config = self.with_state(|state| state.config.clone()).unwrap();
-            for line in lines {
-                let line = Line::new(&config, &line, &document, ctx);
-                let (y_min, y_max) = line.paint_line(scene, scroll_delta);
-                self.y_to_line_mapping.push((y_min, y_max, line));
+            let lines = lines
+                .into_iter()
+                .map(|line| {
+                    let line = Line::new(&config, &line, &document, ctx);
+                    let (y_min, y_max) = line.paint(scene, scroll_delta);
+                    self.y_to_line_mapping.push((y_min, y_max, line.clone()));
+                    line
+                })
+                .collect::<Vec<_>>();
+
+            let cursors = self
+                .with_state(|state| state.get_focused_document_cursors())
+                .flatten()
+                .unwrap_or_else(Vec::new);
+
+            for cursor in cursors {
+                cursor.paint(scene, scroll_delta, &lines);
             }
         }
     }
@@ -158,28 +172,24 @@ impl Widget for EditorPortal {
                 let x = position.x - ctx.paint_rect().x0 - scroll_delta.0;
                 let y = position.y - ctx.paint_rect().y0 - scroll_delta.1;
 
-                let line = self
+                let (line_number, char_index) = self
                     .y_to_line_mapping
                     .iter()
                     .find(|(y_min, y_max, _)| *y_min <= y && y <= *y_max)
-                    .map(|(_, _, line)| line);
-
-                let char_index = line
-                    .map(|line| line.get_clicked_character_index(x as f32))
-                    .flatten();
-
-                line.map(|line| println!("Clicked line: {:?}", line.line))
-                    .unwrap_or_else(|| {
-                        println!("No line found at position: ({}, {})", x, y);
-                    });
-
-                println!("Clicked character index: {:?}", char_index);
-                println!(
-                    "Clicked character: {:?}",
-                    line.and_then(|l| {
-                        char_index.and_then(|index| l.line.content.chars().nth(index))
+                    .map(|(_, _, line)| {
+                        (
+                            line.line.line_number,
+                            line.get_clicked_character_index(x as f32).unwrap_or(0),
+                        )
                     })
-                );
+                    .unwrap_or((0, 0));
+
+                self.with_state(|state| {
+                    state.clear_cursors_from_focused_document();
+                    state.add_cursor_to_focused_document((line_number, char_index));
+                });
+
+                ctx.request_render();
             }
             _ => {}
         }
@@ -197,6 +207,12 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         ctx: &mut ViewCtx,
         app_state: &mut EditorState,
     ) -> (Self::Element, Self::ViewState) {
+        ctx.runtime().spawn(async {
+            loop {
+                println!("Update cursors");
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+        });
         (Pod::new(EditorPortal::new(app_state)), ())
     }
 

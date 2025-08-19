@@ -1,6 +1,8 @@
+use hex_color::HexColor;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, path::PathBuf};
 use std::collections::HashMap;
+use std::{cmp::Ordering, path::PathBuf};
+use xilem::Color;
 
 use super::{Style, theme::Theme};
 
@@ -16,12 +18,12 @@ pub struct VscodeTheme {
 
 impl VscodeTheme {
     pub fn from_json(json: &str) -> Result<Self, Box<dyn std::error::Error>> {
-      Ok(serde_json::from_str(json)?)
+        Ok(serde_json::from_str(json)?)
     }
 
     pub fn from_path(path: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
-      let content = std::fs::read_to_string(path)?;
-      Self::from_json(&content)
+        let content = std::fs::read_to_string(path)?;
+        Self::from_json(&content)
     }
 }
 
@@ -197,8 +199,8 @@ impl Selector {
 
 #[derive(Debug, Default, Clone)]
 struct Resolved {
-    foreground: Option<String>,
-    background: Option<String>,
+    foreground: Option<Color>,
+    background: Option<Color>,
     font_mask: Option<u8>,
 }
 
@@ -223,20 +225,28 @@ fn apply_rule(mut base: Resolved, settings: &Settings) -> Resolved {
     if let Some(fs) = &settings.font_style {
         base.font_mask = Some(parse_font_style(fs));
     }
-    if let Some(fg) = &settings.foreground {
-        base.foreground = Some(fg.clone());
+
+    let fg = settings
+        .foreground
+        .clone()
+        .and_then(|c| HexColor::parse(&c).ok())
+        .map(|c| Color::from_rgba8(c.r, c.g, c.b, c.a));
+    if let Some(fg) = fg {
+        base.foreground = Some(fg);
     }
-    if let Some(bg) = &settings.background {
-        base.background = Some(bg.clone());
+
+    let bg = settings
+        .background
+        .clone()
+        .and_then(|c| HexColor::parse(&c).ok())
+        .map(|c| Color::from_rgba8(c.r, c.g, c.b, c.a));
+    if let Some(bg) = bg {
+        base.background = Some(bg);
     }
     base
 }
 
-fn to_style(
-    foreground: Option<String>,
-    background: Option<String>,
-    font_mask: Option<u8>,
-) -> Style {
+fn to_style(foreground: Option<Color>, background: Option<Color>, font_mask: Option<u8>) -> Style {
     let m = font_mask.unwrap_or(0);
     Style {
         foreground,
@@ -265,8 +275,19 @@ impl Theme for VscodeTheme {
             }
         }
         if matches.is_empty() {
-            let fg = self.colors.get("editor.foreground").cloned();
-            let bg = self.colors.get("editor.background").cloned();
+            let fg = self
+                .colors
+                .get("editor.foreground")
+                .cloned()
+                .and_then(|c| HexColor::parse(&c).ok())
+                .map(|c| Color::from_rgba8(c.r, c.g, c.b, c.a));
+            let bg = self
+                .colors
+                .get("editor.background")
+                .cloned()
+                .and_then(|c| HexColor::parse(&c).ok())
+                .map(|c| Color::from_rgba8(c.r, c.g, c.b, c.a));
+
             return fg.clone().or(bg.clone()).map(|_| to_style(fg, bg, None));
         }
         matches.sort_by(|a, b| match a.0.cmp(&b.0) {
@@ -278,8 +299,13 @@ impl Theme for VscodeTheme {
             resolved = apply_rule(resolved, settings);
         }
         if resolved.foreground.is_none() {
-            if let Some(fg) = self.colors.get("editor.foreground") {
-                resolved.foreground = Some(fg.clone());
+            let fg = self
+                .colors
+                .get("editor.foreground")
+                .and_then(|c| HexColor::parse(&c).ok())
+                .map(|c| Color::from_rgba8(c.r, c.g, c.b, c.a));
+            if let Some(fg) = fg {
+                resolved.foreground = Some(fg);
             }
         }
         Some(to_style(

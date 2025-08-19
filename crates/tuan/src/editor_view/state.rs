@@ -6,7 +6,7 @@ use std::{
 
 use tuan_rpc::{buffer::BufferId, proxy::ProxyResponse};
 
-use super::EditorConfig;
+use super::{EditorConfig, cursor};
 use crate::{document, proxy, workspace};
 
 pub struct EditorState {
@@ -16,6 +16,7 @@ pub struct EditorState {
     pub documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
     pub focused_document_path: Option<PathBuf>,
     pub document_scrollings: HashMap<PathBuf, (f64, f64)>,
+    pub document_cursors: HashMap<PathBuf, Vec<cursor::Cursor>>,
 }
 
 impl EditorState {
@@ -86,6 +87,7 @@ impl EditorState {
             documents: Arc::new(Mutex::new(HashMap::new())),
             focused_document_path: None,
             document_scrollings: HashMap::new(),
+            document_cursors: HashMap::new(),
         }
     }
 
@@ -164,5 +166,44 @@ impl EditorState {
         self.focused_document_path
             .as_ref()
             .and_then(|path| self.get_document_scroll(path))
+    }
+
+    pub fn get_document_cursors(&self, path: &PathBuf) -> Option<Vec<cursor::Cursor>> {
+        self.document_cursors.get(path).cloned()
+    }
+
+    pub fn get_focused_document_cursors(&self) -> Option<Vec<cursor::Cursor>> {
+        self.focused_document_path
+            .as_ref()
+            .and_then(|path| self.get_document_cursors(path))
+    }
+
+    pub fn add_cursor(&mut self, path: PathBuf, position: (usize, usize)) {
+        self.document_cursors
+            .entry(path)
+            .or_insert_with(Vec::new)
+            .push(cursor::Cursor::new(position.0, position.1, self.config.clone()));
+    }
+
+    pub fn add_cursor_to_focused_document(&mut self, position: (usize, usize)) {
+        if let Some(focused_path) = &self.focused_document_path {
+            self.add_cursor(focused_path.clone(), position);
+        } else {
+            println!("No focused document to add cursor");
+        }
+    }
+
+    pub fn clear_cursors(&mut self, path: PathBuf) {
+        if let Some(cursors) = self.document_cursors.get_mut(&path) {
+            cursors.clear();
+        }
+    }
+
+    pub fn clear_cursors_from_focused_document(&mut self) {
+        if let Some(focused_path) = &self.focused_document_path {
+            self.clear_cursors(focused_path.clone());
+        } else {
+            println!("No focused document to clear cursors");
+        }
     }
 }
