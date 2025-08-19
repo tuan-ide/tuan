@@ -19,7 +19,7 @@ impl Default for EditorConfig {
             font_size: 14.0,
             line_height: 1.5,
             theme: theme::Theme::from_vscode_theme(
-                theme::vscode_theme::VscodeTheme::from_path("/Users/arthurfontaine/Developer/code/github.com/arthur-fontaine/tuan/crates/tuan/assets/rose-pine-color-theme.json".into()).unwrap()
+                theme::vscode_theme::VscodeTheme::from_path("/Users/arthurfontaine/Developer/code/github.com/arthur-fontaine/tuan/crates/tuan/assets/rose-pine-moon-color-theme.json".into()).unwrap()
             ),
         }
     }
