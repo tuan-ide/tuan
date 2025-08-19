@@ -1,5 +1,4 @@
 use crate::{document, editor_view::EditorConfig};
-use hex_color::HexColor;
 use masonry::{
     TextAlignOptions,
     core::BrushIndex,
@@ -17,6 +16,7 @@ pub(super) struct Line {
     x_to_character_index_mapping: Vec<(f32, f32, usize)>,
     text_layout: masonry::parley::Layout<BrushIndex>,
     brushes: Vec<Brush>,
+    baseline: f32,
     pub(super) line: document::line::Line,
 }
 
@@ -27,7 +27,7 @@ impl Line {
         document: &document::Document,
         paint_ctx: &mut masonry::core::PaintCtx<'_>,
     ) -> Self {
-        let (text_layout, brushes, x_to_character_index_mapping) =
+        let (text_layout, brushes, x_to_character_index_mapping, max_baseline) =
             Self::get_text_layout(&config, line, document, paint_ctx);
 
         Self {
@@ -36,6 +36,7 @@ impl Line {
             text_layout,
             brushes,
             line: line.clone(),
+            baseline: max_baseline,
         }
     }
 
@@ -48,6 +49,7 @@ impl Line {
         masonry::parley::Layout<BrushIndex>,
         Vec<masonry::peniko::Brush>,
         Vec<(f32, f32, usize)>,
+        f32,
     ) {
         let text = line.clone().content;
 
@@ -96,12 +98,18 @@ impl Line {
         text_layout.align(None, TextAlign::Start, TextAlignOptions::default());
 
         let mut x_to_character_index_mapping = Vec::new();
+        let mut max_baseline = 0.0;
         if let Some(line) = text_layout.lines().next() {
             let mut character_index = 0;
             let mut x = 0.0;
 
             for item in line.items() {
                 if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
+                    let baseline = glyph_run.baseline();
+                    if baseline > max_baseline {
+                        max_baseline = baseline;
+                    }
+
                     for glyph in glyph_run.glyphs() {
                         let new_x = x + glyph.advance;
 
@@ -114,7 +122,12 @@ impl Line {
             }
         }
 
-        (text_layout, brushes, x_to_character_index_mapping)
+        (
+            text_layout,
+            brushes,
+            x_to_character_index_mapping,
+            max_baseline,
+        )
     }
 
     pub(super) fn paint(
@@ -127,8 +140,11 @@ impl Line {
         let brushes = &self.brushes;
         let line_height = self.editor_config.real_line_height();
 
-        let y_min = line.line_number as f64 * line_height as f64;
-        let y_max = y_min + line_height as f64;
+        // The vertical shift to center the text within the line height.
+        let y_line_height_adjustment = (line_height - self.baseline) / 2.0;
+
+        let y_min = line.line_number as f64 * line_height as f64 + y_line_height_adjustment as f64;
+        let y_max = y_min + line_height as f64 + y_line_height_adjustment as f64;
 
         let transform = Affine::translate((scroll_delta.0, scroll_delta.1 + y_min));
 
