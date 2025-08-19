@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use super::line::Line;
 use crate::editor_view::EditorState;
 use masonry::{
@@ -8,7 +10,7 @@ use masonry::{
 use winit::dpi::LogicalPosition;
 use xilem::{
     Pod, ViewCtx, WidgetView,
-    core::{View, ViewMarker},
+    core::{View, ViewMarker, fork},
     tokio,
     view::{button, flex, task},
 };
@@ -16,12 +18,29 @@ use xilem::{
 pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
     state.open_file("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
 
-    flex((
-        button("Open File", |state: &mut EditorState| {
-            state.focus_document("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
-        }),
-        EditorView,
-    ))
+    fork(
+        // TODO: remove the flex box and the Open File button, those are just for testing
+        flex((
+            button("Open File", |state: &mut EditorState| {
+                state.focus_document("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
+            }),
+            EditorView,
+        )),
+        task(
+            async move |proxy| {
+                let mut interval = tokio::time::interval(Duration::from_millis(500));
+                loop {
+                    interval.tick().await;
+                    let Ok(()) = proxy.message(()) else {
+                        break;
+                    };
+                }
+            },
+            |data: &mut EditorState, ()| {
+                data.tick_cursors();
+            },
+        ),
+    )
 }
 
 struct EditorPortal {
@@ -207,13 +226,7 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         ctx: &mut ViewCtx,
         app_state: &mut EditorState,
     ) -> (Self::Element, Self::ViewState) {
-        ctx.runtime().spawn(async {
-            loop {
-                println!("Update cursors");
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            }
-        });
-        (Pod::new(EditorPortal::new(app_state)), ())
+        (ctx.create_pod(EditorPortal::new(app_state)), ())
     }
 
     fn rebuild(

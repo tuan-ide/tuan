@@ -48,7 +48,11 @@ impl Document {
         self.buffer.get_lines_in_range(min_line..max_line)
     }
 
-    pub fn get_styles_in_range(&self, start: usize, end: usize) -> impl Iterator<Item = &RangeStyle> {
+    pub fn get_styles_in_range(
+        &self,
+        start: usize,
+        end: usize,
+    ) -> impl Iterator<Item = &RangeStyle> {
         self.styles
             .iter()
             .filter(move |style| style.start < end && style.end > start)

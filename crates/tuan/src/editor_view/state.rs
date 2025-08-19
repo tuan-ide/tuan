@@ -206,4 +206,14 @@ impl EditorState {
             println!("No focused document to clear cursors");
         }
     }
+
+    pub fn tick_cursors(&mut self) {
+        if let Some(focused_path) = &self.focused_document_path {
+            if let Some(cursors) = self.document_cursors.get_mut(focused_path) {
+                for cursor in cursors {
+                    cursor.tick();
+                }
+            }
+        }
+    }
 }
