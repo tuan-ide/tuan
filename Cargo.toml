@@ -20,6 +20,7 @@ parking_lot = { version = "0.12.4" }
 serde = { version = "1" }
 serde_json = { version = "1" }
 tracing = { version = "0.1.0" }
+tracing-subscriber = { version = "0.3.0", features = ["env-filter"] }
 tuan-rpc = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-rpc", rev = "e26e06dae6a886cc1f26ea09bdfeff0c1960e240" }
 tuan-proxy = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-proxy", rev = "e26e06dae6a886cc1f26ea09bdfeff0c1960e240" }
 tuan-core = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-core", rev = "e26e06dae6a886cc1f26ea09bdfeff0c1960e240" }

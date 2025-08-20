@@ -67,7 +67,7 @@ impl EditorPortal {
         unsafe {
             let state = &mut *self.state;
             if !state.initialized {
-                println!("EditorState is not initialized");
+                tracing::debug!("EditorState is not initialized");
                 return None;
             }
             Some(f(state))
@@ -110,7 +110,7 @@ impl Widget for EditorPortal {
         if let Some(mut document) = document {
             document.update_styles_with_syntax();
             self.y_to_line_mapping.clear();
-            
+
             let lines = document.get_visible_lines(viewport);
             let cursors = self
                 .with_state(|state| state.get_focused_document_cursors())
@@ -213,6 +213,10 @@ impl Widget for EditorPortal {
             _ => {}
         }
     }
+
+    fn get_debug_text(&self) -> Option<String> {
+        "EditorPortal".to_string().into()
+    }
 }
 
 struct EditorView;
@@ -258,12 +262,6 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         message: xilem::core::DynMessage,
         app_state: &mut EditorState,
     ) -> xilem::core::MessageResult<()> {
-        debug_assert!(
-            !id_path.is_empty(),
-            "id path should be non-empty in GameView::message"
-        );
-
-        // but we haven't set up children yet, so shouldn't be empty either (should just not get here)
-        unreachable!("message should not be sent to GameView without child.");
+        unreachable!("message should not be sent to EditorView without child.");
     }
 }

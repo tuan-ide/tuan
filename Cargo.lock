@@ -5083,6 +5083,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tracing 0.1.41",
+ "tracing-subscriber",
  "winit",
  "xilem",
 ]

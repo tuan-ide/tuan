@@ -35,7 +35,7 @@ impl EditorState {
             let notification_rx = proxy.notification_rx.clone();
             move || {
                 while let Ok(data) = notification_rx.recv() {
-                    println!("Received notification: {:?}", data);
+                    tracing::debug!("Received notification: {:?}", data);
                 }
             }
         });
@@ -47,13 +47,13 @@ impl EditorState {
                 while let Ok(notification) = core_rx.recv() {
                     match notification {
                         tuan_rpc::core::CoreRpc::Request(id, req) => {
-                            println!("CoreRpc::Request - id: {:?}, req: {:?}", id, req);
+                            tracing::debug!("CoreRpc::Request - id: {:?}, req: {:?}", id, req);
                         }
                         tuan_rpc::core::CoreRpc::Notification(notif) => {
-                            println!("CoreRpc::Notification - notif: {:?}", notif);
+                            tracing::debug!("CoreRpc::Notification - notif: {:?}", notif);
                         }
                         tuan_rpc::core::CoreRpc::Shutdown => {
-                            println!("CoreRpc::Shutdown");
+                            tracing::debug!("CoreRpc::Shutdown");
                         }
                     }
                 }
@@ -67,13 +67,13 @@ impl EditorState {
                 // while let Ok(notification) = proxy_rx.recv() {
                 //     match notification {
                 //         tuan_rpc::proxy::ProxyRpc::Request(id, req) => {
-                //             println!("ProxyRpc::Request - id: {:?}, req: {:?}", id, req);
+                //             tracing::debug!("ProxyRpc::Request - id: {:?}, req: {:?}", id, req);
                 //         }
                 //         tuan_rpc::proxy::ProxyRpc::Notification(notif) => {
-                //             println!("ProxyRpc::Notification - notif: {:?}", notif);
+                //             tracing::debug!("ProxyRpc::Notification - notif: {:?}", notif);
                 //         }
                 //         tuan_rpc::proxy::ProxyRpc::Shutdown => {
-                //             println!("ProxyRpc::Shutdown");
+                //             tracing::debug!("ProxyRpc::Shutdown");
                 //         }
                 //     }
                 // }
@@ -126,7 +126,7 @@ impl EditorState {
             if let Some(document) = docs.get_mut(&path) {
                 document.update_styles_with_syntax();
             } else {
-                println!("Document not found for path: {:?}", path);
+                tracing::debug!("Document not found for path: {:?}", path);
             }
         });
     }
@@ -134,9 +134,9 @@ impl EditorState {
     pub fn focus_document(&mut self, path: PathBuf) {
         if self.documents.lock().unwrap().contains_key(&path) {
             self.focused_document_path = Some(path.clone());
-            println!("Focused document: {:?}", path);
+            tracing::debug!("Focused document: {:?}", path);
         } else {
-            println!("Document not found: {:?}", path);
+            tracing::debug!("Document not found: {:?}", path);
         }
     }
 
@@ -154,7 +154,7 @@ impl EditorState {
             *x += delta.0;
             *y += delta.1;
         } else {
-            println!("No focused document to scroll");
+            tracing::debug!("No focused document to scroll");
         }
     }
 
@@ -189,7 +189,7 @@ impl EditorState {
         if let Some(focused_path) = &self.focused_document_path {
             self.add_cursor(focused_path.clone(), position);
         } else {
-            println!("No focused document to add cursor");
+            tracing::debug!("No focused document to add cursor");
         }
     }
 
@@ -203,7 +203,7 @@ impl EditorState {
         if let Some(focused_path) = &self.focused_document_path {
             self.clear_cursors(focused_path.clone());
         } else {
-            println!("No focused document to clear cursors");
+            tracing::debug!("No focused document to clear cursors");
         }
     }
 
