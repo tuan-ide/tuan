@@ -110,26 +110,26 @@ impl Widget for EditorPortal {
         if let Some(mut document) = document {
             document.update_styles_with_syntax();
             self.y_to_line_mapping.clear();
+            
             let lines = document.get_visible_lines(viewport);
-
-            let config = self.with_state(|state| state.config.clone()).unwrap();
-            let lines = lines
-                .into_iter()
-                .map(|line| {
-                    let line = Line::new(&config, &line, &document, ctx);
-                    let (y_min, y_max) = line.paint(scene, scroll_delta);
-                    self.y_to_line_mapping.push((y_min, y_max, line.clone()));
-                    line
-                })
-                .collect::<Vec<_>>();
-
             let cursors = self
                 .with_state(|state| state.get_focused_document_cursors())
                 .flatten()
                 .unwrap_or_else(Vec::new);
 
+            let config = self.with_state(|state| state.config.clone()).unwrap();
+            let lines = lines
+                .into_iter()
+                .map(|line| Line::new(&config, &line, &document, ctx, cursors.clone()))
+                .collect::<Vec<_>>();
+
             for cursor in cursors {
                 cursor.paint(scene, scroll_delta, &lines);
+            }
+
+            for line in &lines {
+                let (y_min, y_max) = line.paint(scene, scroll_delta);
+                self.y_to_line_mapping.push((y_min, y_max, line.clone()));
             }
         }
     }

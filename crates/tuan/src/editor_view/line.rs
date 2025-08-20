@@ -1,4 +1,8 @@
-use crate::{document, editor_view::EditorConfig};
+use crate::{
+    document,
+    editor_view::EditorConfig,
+    theme::{self, theme::Theme as _},
+};
 use masonry::{
     TextAlignOptions,
     core::BrushIndex,
@@ -7,7 +11,9 @@ use masonry::{
     },
     peniko::Brush,
 };
-use xilem::{Affine, FontWeight, TextAlign};
+use xilem::{Affine, Color, FontWeight, TextAlign};
+
+use super::cursor;
 
 #[derive(Clone)]
 pub(super) struct Line {
@@ -26,9 +32,10 @@ impl Line {
         line: &document::line::Line,
         document: &document::Document,
         paint_ctx: &mut masonry::core::PaintCtx<'_>,
+        cursors: Vec<cursor::Cursor>,
     ) -> Self {
         let (text_layout, brushes, x_to_character_index_mapping, max_baseline) =
-            Self::get_text_layout(&config, line, document, paint_ctx);
+            Self::get_text_layout(&config, line, document, paint_ctx, cursors);
 
         Self {
             editor_config: config.clone(),
@@ -45,6 +52,7 @@ impl Line {
         line: &document::line::Line,
         document: &document::Document,
         ctx: &mut masonry::core::PaintCtx<'_>,
+        cursors: Vec<cursor::Cursor>,
     ) -> (
         masonry::parley::Layout<BrushIndex>,
         Vec<masonry::peniko::Brush>,
@@ -84,12 +92,28 @@ impl Line {
             if style.strikethrough {
                 text_layout_builder.push(StyleProperty::Strikethrough(true), range.clone());
             }
-            if let Some(color) = style.foreground {
+            if let Some(color) = style.foreground.or(style.color) {
                 brushes.push(color.into());
 
                 let brush_index = BrushIndex(brushes.len() - 1);
 
                 text_layout_builder.push(StyleProperty::Brush(brush_index), range.clone());
+            }
+        }
+
+        let on_cursor_color = match &editor_config.theme {
+            theme::Theme::Vscode(vscode_theme) => vscode_theme
+                .get_style(vec!["editorCursor.background"])
+                .and_then(|s| s.color),
+        };
+        brushes.push(on_cursor_color.unwrap_or_else(|| Color::BLACK).into());
+        let on_cursor_brush_index = BrushIndex(brushes.len() - 1);
+        for cursor in cursors {
+            if cursor.line == line.line_number && cursor.blink_state == cursor::BlinkState::On {
+                text_layout_builder.push(
+                    StyleProperty::Brush(on_cursor_brush_index.clone()),
+                    cursor.column..(cursor.column + 1),
+                );
             }
         }
 

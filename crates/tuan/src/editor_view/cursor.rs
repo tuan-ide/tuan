@@ -7,8 +7,8 @@ use crate::theme::{self, theme::Theme};
 
 use super::{config::EditorConfig, line};
 
-#[derive(Clone, Debug)]
-enum BlinkState {
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum BlinkState {
     On,
     Off,
 }
@@ -17,7 +17,7 @@ enum BlinkState {
 pub struct Cursor {
     pub line: usize,
     pub column: usize,
-    blink_state: BlinkState,
+    pub blink_state: BlinkState,
     editor_config: Arc<EditorConfig>,
 }
 
@@ -57,12 +57,9 @@ impl Cursor {
     ) -> Option<()> {
         let line_height = self.editor_config.real_line_height();
 
-        let line = lines
-            .iter()
-            .find(|l| l.line.line_number == self.line)?;
+        let line = lines.iter().find(|l| l.line.line_number == self.line)?;
 
-        let x_range = line
-            .get_x_range_for_index(self.column)?;
+        let x_range = line.get_x_range_for_index(self.column)?;
 
         let x = x_range.0 as f64 + scroll_delta.0;
         let y = ((self.line as f32) * line_height) as f64 + scroll_delta.1;
@@ -77,7 +74,7 @@ impl Cursor {
         let cursor_color = match &self.editor_config.theme {
             theme::Theme::Vscode(vscode_theme) => vscode_theme
                 .get_style(vec!["editorCursor.foreground"])
-                .and_then(|s| s.foreground),
+                .and_then(|s| s.color),
         }
         .unwrap_or(Color::BLACK);
 

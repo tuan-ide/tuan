@@ -249,6 +249,7 @@ fn apply_rule(mut base: Resolved, settings: &Settings) -> Resolved {
 fn to_style(foreground: Option<Color>, background: Option<Color>, font_mask: Option<u8>) -> Style {
     let m = font_mask.unwrap_or(0);
     Style {
+        color: None,
         foreground,
         background,
         italic: (m & 1) != 0,
@@ -275,6 +276,25 @@ impl Theme for VscodeTheme {
             }
         }
         if matches.is_empty() {
+            for token in tokens {
+                if let Some(color) = self.colors.get(token) {
+                    let color = HexColor::parse(color)
+                        .ok()
+                        .map(|c| Color::from_rgba8(c.r, c.g, c.b, c.a));
+                    if let Some(color) = color {
+                        return Some(Style {
+                            color: Some(color),
+                            foreground: None,
+                            background: None,
+                            italic: false,
+                            bold: false,
+                            underline: false,
+                            strikethrough: false,
+                        });
+                    }
+                }
+            }
+
             let fg = self
                 .colors
                 .get("editor.foreground")
