@@ -22,3 +22,4 @@ tuan-proxy.workspace = true
 tuan-core.workspace = true
 dirs.workspace = true
 hex_color.workspace = true
+keybinds.workspace = true

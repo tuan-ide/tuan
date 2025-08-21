@@ -1,5 +1,6 @@
 use super::paint::line::Line;
 use crate::{document::Document, editor_view::EditorState};
+use masonry::core::Modifiers;
 use masonry::core::keyboard::Key;
 use masonry::{
     accesskit::Role,
@@ -215,9 +216,10 @@ impl Widget for EditorPortal {
     ) {
         if let masonry::core::TextEvent::Keyboard(key_event) = event {
             if key_event.state.is_down() {
-                ctx.submit_action(EditorAction::KeyPress(key_event.key.clone()));
-            } else {
-                ctx.submit_action(EditorAction::KeyRelease(key_event.key.clone()));
+                ctx.submit_action(EditorAction::KeyPress(
+                    key_event.key.clone(),
+                    key_event.modifiers,
+                ));
             }
         }
     }
@@ -283,15 +285,9 @@ impl View<EditorState, (), ViewCtx> for EditorView {
     ) -> xilem::core::MessageResult<()> {
         if let Ok(editor_action) = message.downcast::<EditorAction>() {
             match editor_action.as_ref() {
-                EditorAction::KeyPress(key_code) => {
-                    app_state.press_key(key_code.clone());
-                    app_state.handle_keybind();
-                    MessageResult::Nop
-                }
-                EditorAction::KeyRelease(key_code) => {
-                    app_state.release_key(key_code.clone());
-                    app_state.handle_keybind();
-                    MessageResult::Nop
+                EditorAction::KeyPress(key, modifiers) => {
+                    app_state.press_key(key.clone(), modifiers.clone());
+                    MessageResult::RequestRebuild
                 }
                 EditorAction::Scroll { delta, document } => {
                     app_state.scroll_document(&document.path, (delta.0, delta.1));
@@ -314,8 +310,7 @@ impl View<EditorState, (), ViewCtx> for EditorView {
 
 #[derive(Debug)]
 enum EditorAction {
-    KeyPress(Key),
-    KeyRelease(Key),
+    KeyPress(Key, Modifiers),
     Scroll {
         delta: (f64, f64),
         document: Document,

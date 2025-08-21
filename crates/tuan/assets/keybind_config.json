@@ -1,0 +1,8 @@
+{
+  "keybinds": [
+    {
+      "key": "Left",
+      "action": "CursorLeft"
+    }
+  ]
+}
