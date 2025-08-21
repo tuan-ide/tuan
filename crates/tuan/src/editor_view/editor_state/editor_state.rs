@@ -64,26 +64,6 @@ impl EditorState {
             }
         });
 
-        std::thread::spawn({
-            let proxy_rpc = proxy.proxy_rpc.clone();
-            let proxy_rx = proxy_rpc.rx().clone();
-            move || {
-                // while let Ok(notification) = proxy_rx.recv() {
-                //     match notification {
-                //         tuan_rpc::proxy::ProxyRpc::Request(id, req) => {
-                //             tracing::debug!("ProxyRpc::Request - id: {:?}, req: {:?}", id, req);
-                //         }
-                //         tuan_rpc::proxy::ProxyRpc::Notification(notif) => {
-                //             tracing::debug!("ProxyRpc::Notification - notif: {:?}", notif);
-                //         }
-                //         tuan_rpc::proxy::ProxyRpc::Shutdown => {
-                //             tracing::debug!("ProxyRpc::Shutdown");
-                //         }
-                //     }
-                // }
-            }
-        });
-
         Self {
             proxy,
             keybindings: keybinds,
