@@ -42,7 +42,17 @@ impl Cursor {
 
         let line = lines.iter().find(|l| l.line.line_number == self.line)?;
 
-        let x_range = line.get_x_range_for_index(self.column)?;
+        let x_range = line.get_x_range_for_index(self.column);
+        let x_range = match x_range {
+            Some(x_range) => x_range,
+            None => {
+                // In case the cursor is at the end of the line, we take the previous character's range
+                // and shift it to the right
+                let x_range = line.get_x_range_for_index(self.column - 1)?;
+                let delta = x_range.1 - x_range.0;
+                (x_range.0 + delta, x_range.1 + delta)
+            }
+        };
 
         let x = x_range.0 as f64 + scroll_delta.0;
         let y = ((self.line as f32) * line_height) as f64 + scroll_delta.1;
