@@ -1,4 +1,6 @@
 use super::paint::line::Line;
+use crate::theme;
+use crate::theme::theme::Theme as _;
 use crate::{document::Document, editor_view::EditorState};
 use masonry::core::Modifiers;
 use masonry::core::keyboard::Key;
@@ -9,6 +11,7 @@ use masonry::{
 };
 use std::time::Duration;
 use winit::dpi::LogicalPosition;
+use xilem::{Affine, Color};
 use xilem::{
     Pod, ViewCtx, WidgetView,
     core::{MessageResult, View, ViewMarker, fork},
@@ -83,6 +86,21 @@ impl Widget for EditorPortal {
         let mut document = document.unwrap();
 
         let size = ctx.size();
+
+        let background_rect = Rect::new(0.0, 0.0, size.width, size.height);
+        let background_color = match &self.state.config.theme {
+            theme::Theme::Vscode(vscode_theme) => vscode_theme
+                .get_style(vec!["editor.background"])
+                .and_then(|s| s.color),
+        }
+        .unwrap_or(Color::BLACK);
+        scene.fill(
+            masonry::peniko::Fill::EvenOdd,
+            Affine::IDENTITY,
+            background_color,
+            None,
+            &background_rect,
+        );
 
         let scroll_delta = self
             .state
