@@ -69,6 +69,14 @@ impl Document {
             .filter(move |style| style.start < end && style.end > start)
     }
 
+    pub fn get_line(&self, line: usize) -> Option<line::Line> {
+        self.get_lines().nth(line)
+    }
+
+    pub fn get_lines(&self) -> impl Iterator<Item = line::Line> {
+        self.buffer.iter_lines()
+    }
+
     pub fn update_styles_with_syntax(&mut self) {
         let mut syntax = Syntax::init(&self.path);
         syntax.parse(1, self.buffer.text.clone(), None);

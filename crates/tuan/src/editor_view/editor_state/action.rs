@@ -7,6 +7,10 @@ pub enum EditorAction {
     CursorRight,
     CursorUp,
     CursorDown,
+    CursorStart,
+    CursorEnd,
+    CursorTop,
+    CursorBottom
 }
 
 impl super::EditorState {
@@ -15,28 +19,56 @@ impl super::EditorState {
             EditorAction::CursorLeft => {
                 self.with_cursors_mut(|cursors| {
                     for cursor in cursors {
-                        cursor.move_left(1);
+                        cursor.move_x_at(cursor.column.saturating_sub(1));
                     }
                 });
             }
             EditorAction::CursorRight => {
                 self.with_cursors_mut(|cursors| {
                     for cursor in cursors {
-                        cursor.move_right(1);
+                        cursor.move_x_at(cursor.column.saturating_add(1));
                     }
                 });
             }
             EditorAction::CursorUp => {
                 self.with_cursors_mut(|cursors| {
                     for cursor in cursors {
-                        cursor.move_up(1);
+                        cursor.move_y_at(cursor.line.saturating_sub(1));
                     }
                 });
             }
             EditorAction::CursorDown => {
                 self.with_cursors_mut(|cursors| {
                     for cursor in cursors {
-                        cursor.move_down(1);
+                        cursor.move_y_at(cursor.line.saturating_add(1));
+                    }
+                });
+            }
+            EditorAction::CursorStart => {
+                self.with_cursors_mut(|cursors| {
+                    for cursor in cursors {
+                        cursor.move_x_at(0);
+                    }
+                });
+            }
+            EditorAction::CursorEnd => {
+                self.with_cursors_mut(|cursors| {
+                    for cursor in cursors {
+                        cursor.move_x_at(usize::MAX);
+                    }
+                });
+            }
+            EditorAction::CursorTop => {
+                self.with_cursors_mut(|cursors| {
+                    for cursor in cursors {
+                        cursor.move_y_at(0);
+                    }
+                });
+            }
+            EditorAction::CursorBottom => {
+                self.with_cursors_mut(|cursors| {
+                    for cursor in cursors {
+                        cursor.move_y_at(usize::MAX);
                     }
                 });
             }

@@ -15,6 +15,22 @@
     {
       "key": "Down",
       "action": "CursorDown"
+    },
+    {
+      "key": "Cmd+Left",
+      "action": "CursorStart"
+    },
+    {
+      "key": "Cmd+Right",
+      "action": "CursorEnd"
+    },
+    {
+      "key": "Cmd+Up",
+      "action": "CursorTop"
+    },
+    {
+      "key": "Cmd+Down",
+      "action": "CursorBottom"
     }
   ]
 }

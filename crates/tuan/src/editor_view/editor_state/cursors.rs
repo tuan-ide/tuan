@@ -7,12 +7,14 @@ impl super::EditorState {
     }
 
     pub fn add_cursor(&mut self, path: PathBuf, position: &(usize, usize)) {
+        let document = self.get_focused_document().unwrap();
         self.document_cursors
             .entry(path)
             .or_insert_with(Vec::new)
             .push(cursor::Cursor::new(
                 position.0,
                 position.1,
+                document,
                 self.config.clone(),
             ));
     }

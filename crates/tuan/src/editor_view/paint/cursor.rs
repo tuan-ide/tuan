@@ -4,6 +4,7 @@ use masonry::kurbo::Rect;
 use xilem::{Affine, Color};
 
 use crate::{
+    document,
     editor_view::{EditorConfig, paint::line},
     theme::{self, theme::Theme},
 };
@@ -21,6 +22,7 @@ pub struct Cursor {
     pub column: usize,
     pub blink_state: BlinkState,
     editor_config: Arc<EditorConfig>,
+    document: document::Document,
 }
 
 impl Cursor {
@@ -67,10 +69,16 @@ impl Cursor {
 }
 
 impl Cursor {
-    pub fn new(line: usize, column: usize, editor_config: Arc<EditorConfig>) -> Self {
+    pub fn new(
+        line: usize,
+        column: usize,
+        document: document::Document,
+        editor_config: Arc<EditorConfig>,
+    ) -> Self {
         Self {
             line,
             column,
+            document,
             blink_state: BlinkState::On,
             editor_config,
         }
@@ -95,31 +103,34 @@ impl Cursor {
 }
 
 impl Cursor {
-    pub fn move_left(&mut self, chars: usize) {
-        if self.column >= chars {
-            self.column -= chars;
-        } else {
-            self.column = 0;
-        }
+    fn get_min_x(&self) -> usize {
+        0
+    }
+
+    fn get_max_x(&self) -> usize {
+        self.document
+            .get_line(self.line)
+            .map(|line| line.content.len().saturating_sub(1))
+            .unwrap_or(0)
+    }
+
+    fn get_min_y(&self) -> usize {
+        0
+    }
+
+    fn get_max_y(&self) -> usize {
+        self.document.get_lines().count().saturating_sub(1)
+    }
+
+    pub fn move_x_at(&mut self, chars: usize) {
+        self.column = chars.clamp(self.get_min_x(), self.get_max_x());
+        self.line = self.line.clamp(self.get_min_y(), self.get_max_y());
         self.set_blink_state(BlinkState::Move);
     }
 
-    pub fn move_right(&mut self, chars: usize) {
-        self.column += chars;
-        self.set_blink_state(BlinkState::Move);
-    }
-
-    pub fn move_down(&mut self, lines: usize) {
-        self.line += lines;
-        self.set_blink_state(BlinkState::Move);
-    }
-
-    pub fn move_up(&mut self, lines: usize) {
-        if self.line >= lines {
-            self.line -= lines;
-        } else {
-            self.line = 0;
-        }
+    pub fn move_y_at(&mut self, lines: usize) {
+        self.line = lines.clamp(self.get_min_y(), self.get_max_y());
+        self.column = self.column.clamp(self.get_min_x(), self.get_max_x());
         self.set_blink_state(BlinkState::Move);
     }
 }
