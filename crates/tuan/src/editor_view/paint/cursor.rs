@@ -108,10 +108,7 @@ impl Cursor {
     }
 
     fn get_max_x(&self) -> usize {
-        self.document
-            .get_line(self.line)
-            .map(|line| line.content.len().saturating_sub(1))
-            .unwrap_or(0)
+        self.document.get_line_length(self.line).saturating_sub(1)
     }
 
     fn get_min_y(&self) -> usize {
@@ -119,7 +116,7 @@ impl Cursor {
     }
 
     fn get_max_y(&self) -> usize {
-        self.document.get_lines().count().saturating_sub(1)
+        self.document.count_lines().saturating_sub(1)
     }
 
     pub fn move_x_at(&mut self, chars: usize) {

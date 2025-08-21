@@ -1,9 +1,9 @@
 use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
 use masonry::kurbo::Rect;
-use tuan_core::syntax::Syntax;
+use tuan_core::{buffer::rope_text::RopeText, syntax::Syntax};
 
-use super::{buffer, line};
+use super::line;
 use crate::{
     editor_view,
     theme::{self, theme::Theme as _},
@@ -19,7 +19,7 @@ pub struct RangeStyle {
 #[derive(Clone)]
 pub struct Document {
     pub(crate) path: PathBuf,
-    buffer: buffer::Buffer,
+    buffer: tuan_core::buffer::Buffer,
     config: Arc<editor_view::EditorConfig>,
     styles: Vec<RangeStyle>,
 }
@@ -28,7 +28,7 @@ impl Debug for Document {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Document")
             .field("path", &self.path)
-            .field("buffer", &self.buffer.text.len())
+            .field("buffer", &self.buffer.text().len())
             .field("config", &"&self.config")
             .field("styles", &self.styles.len())
             .finish()
@@ -44,7 +44,7 @@ impl Document {
     ) -> Self {
         Self {
             path,
-            buffer: buffer::Buffer::new(content, read_only),
+            buffer: tuan_core::buffer::Buffer::new(content),
             config,
             styles: Vec::new(),
         }
@@ -56,7 +56,12 @@ impl Document {
         let min_line = (viewport.y0 / line_height as f64).floor() as usize;
         let max_line = (viewport.y1 / line_height as f64).ceil() as usize;
 
-        self.buffer.get_lines_in_range(min_line..max_line)
+        (min_line..max_line).map(move |line_number| line::Line {
+            content: self.buffer.line_content(line_number).to_string(),
+            line_number,
+            start: self.buffer.offset_of_line(line_number),
+            end: self.buffer.line_end_offset(line_number, true),
+        })
     }
 
     pub fn get_styles_in_range(
@@ -69,17 +74,17 @@ impl Document {
             .filter(move |style| style.start < end && style.end > start)
     }
 
-    pub fn get_line(&self, line: usize) -> Option<line::Line> {
-        self.get_lines().nth(line)
+    pub fn get_line_length(&self, line: usize) -> usize {
+        self.buffer.line_len(line)
     }
 
-    pub fn get_lines(&self) -> impl Iterator<Item = line::Line> {
-        self.buffer.iter_lines()
+    pub fn count_lines(&self) -> usize {
+        self.buffer.num_lines()
     }
 
     pub fn update_styles_with_syntax(&mut self) {
         let mut syntax = Syntax::init(&self.path);
-        syntax.parse(1, self.buffer.text.clone(), None);
+        syntax.parse(1, self.buffer.text().clone(), None);
         self.styles = if let Some(syntax_styles) = syntax.styles {
             syntax_styles
                 .iter()
