@@ -12,6 +12,7 @@ use crate::{
 pub enum BlinkState {
     On,
     Off,
+    Move,
 }
 
 #[derive(Clone, Debug)]
@@ -42,6 +43,7 @@ impl Cursor {
 
         let cursor_rect = match self.blink_state {
             BlinkState::On => Rect::new(x, y, x + width, y + height),
+            BlinkState::Move => Rect::new(x, y, x + width, y + height),
             BlinkState::Off => Rect::new(0.0, 0.0, 0.0, 0.0),
         };
 
@@ -82,11 +84,39 @@ impl Cursor {
         let new_state = match self.blink_state {
             BlinkState::On => BlinkState::Off,
             BlinkState::Off => BlinkState::On,
+            BlinkState::Move => BlinkState::On,
         };
         self.set_blink_state(new_state);
     }
 
     pub fn tick(&mut self) {
         self.next_blink_state();
+    }
+}
+
+impl Cursor {
+    pub fn move_left(&mut self, chars: usize) {
+        if self.column >= chars {
+            self.column -= chars;
+        } else {
+            self.column = 0;
+        }
+        self.set_blink_state(BlinkState::Move);
+    }
+
+    pub fn move_right(&mut self, chars: usize) {
+        self.column += chars;
+    }
+
+    pub fn move_down(&mut self, lines: usize) {
+        self.line += lines;
+    }
+
+    pub fn move_up(&mut self, lines: usize) {
+        if self.line >= lines {
+            self.line -= lines;
+        } else {
+            self.line = 0;
+        }
     }
 }

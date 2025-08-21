@@ -1,25 +1,24 @@
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
-
-use tuan_rpc::{buffer::BufferId, proxy::ProxyResponse};
-
 use crate::{
     document,
     editor_view::{EditorConfig, paint::cursor},
     proxy, workspace,
 };
+use masonry::core::keyboard::Key;
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
+#[derive(Clone)]
 pub struct EditorState {
-    pub initialized: bool,
     pub(super) proxy: proxy::ProxyData,
     pub config: Arc<EditorConfig>,
     pub documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
     pub focused_document_path: Option<PathBuf>,
     pub document_scrollings: HashMap<PathBuf, (f64, f64)>,
     pub document_cursors: HashMap<PathBuf, Vec<cursor::Cursor>>,
+    pub keys_pressed: HashSet<Key>,
 }
 
 impl EditorState {
@@ -84,13 +83,13 @@ impl EditorState {
         });
 
         Self {
-            initialized: true,
             proxy,
             config: editor_config,
             documents: Arc::new(Mutex::new(HashMap::new())),
             focused_document_path: None,
             document_scrollings: HashMap::new(),
             document_cursors: HashMap::new(),
+            keys_pressed: HashSet::new(),
         }
     }
 }

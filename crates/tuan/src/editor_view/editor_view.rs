@@ -1,12 +1,13 @@
 use super::paint::line::Line;
 use crate::{document::Document, editor_view::EditorState};
+use masonry::core::keyboard::Key;
 use masonry::{
     accesskit::Role,
     core::{ScrollDelta, Widget},
     kurbo::Rect,
 };
 use std::time::Duration;
-use winit::{dpi::LogicalPosition, keyboard::KeyCode};
+use winit::dpi::LogicalPosition;
 use xilem::{
     Pod, ViewCtx, WidgetView,
     core::{MessageResult, View, ViewMarker, fork},
@@ -43,33 +44,15 @@ pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + us
 }
 
 struct EditorPortal {
-    state: *mut EditorState, // TODO: Try with Arc or Rc
+    state: EditorState,
     y_to_line_mapping: Vec<(f64, f64, Line)>,
 }
 
 impl EditorPortal {
-    fn new(state: *mut EditorState) -> Self {
+    fn new(state: EditorState) -> Self {
         Self {
             state,
             y_to_line_mapping: Vec::new(),
-        }
-    }
-
-    fn with_state<F, R>(&mut self, f: F) -> Option<R>
-    where
-        F: FnOnce(&mut EditorState) -> R,
-    {
-        if self.state.is_null() {
-            return None;
-        }
-
-        unsafe {
-            let state = &mut *self.state;
-            if !state.initialized {
-                tracing::debug!("EditorState is not initialized");
-                return None;
-            }
-            Some(f(state))
         }
     }
 }
@@ -90,9 +73,7 @@ impl Widget for EditorPortal {
         props: &masonry::core::PropertiesRef<'_>,
         scene: &mut masonry::vello::Scene,
     ) {
-        let document = self
-            .with_state(|state| state.get_focused_document())
-            .flatten();
+        let document = self.state.get_focused_document();
 
         if document.is_none() {
             tracing::debug!("No focused document to paint");
@@ -103,9 +84,10 @@ impl Widget for EditorPortal {
         let size = ctx.size();
 
         let scroll_delta = self
-            .with_state(|state| state.get_document_scroll(&document.path))
-            .flatten()
+            .state
+            .get_document_scroll(&document.path)
             .unwrap_or((0.0, 0.0));
+
         let viewport = Rect::new(
             -scroll_delta.0,
             -scroll_delta.1,
@@ -118,11 +100,11 @@ impl Widget for EditorPortal {
 
         let lines = document.get_visible_lines(viewport);
         let cursors = self
-            .with_state(|state| state.get_document_cursors(&document.path))
-            .flatten()
+            .state
+            .get_document_cursors(&document.path)
             .unwrap_or_else(Vec::new);
 
-        let config = self.with_state(|state| state.config.clone()).unwrap();
+        let config = self.state.config.clone();
         let lines = lines
             .into_iter()
             .map(|line| Line::new(&config, &line, &document, ctx, cursors.clone()))
@@ -173,10 +155,7 @@ impl Widget for EditorPortal {
                 state,
             } => {
                 if let ScrollDelta::PixelDelta(delta) = delta {
-                    if let Some(focused_document) = self
-                        .with_state(|state| state.get_focused_document())
-                        .flatten()
-                    {
+                    if let Some(focused_document) = self.state.get_focused_document() {
                         ctx.submit_action(EditorAction::Scroll {
                             delta: (delta.x, delta.y),
                             document: focused_document,
@@ -189,14 +168,13 @@ impl Widget for EditorPortal {
                 button,
                 state,
             } => {
-                let focused_document = self
-                    .with_state(|state| state.get_focused_document())
-                    .flatten()
-                    .expect("Focused document should not be None");
+                ctx.request_focus();
+
+                let focused_document = self.state.get_focused_document().unwrap();
 
                 let scroll_delta = self
-                    .with_state(|state| state.get_document_scroll(&focused_document.path))
-                    .flatten()
+                    .state
+                    .get_document_scroll(&focused_document.path)
                     .unwrap_or((0.0, 0.0));
 
                 let position: LogicalPosition<f64> =
@@ -229,6 +207,29 @@ impl Widget for EditorPortal {
         }
     }
 
+    fn on_text_event(
+        &mut self,
+        ctx: &mut masonry::core::EventCtx<'_>,
+        props: &mut masonry::core::PropertiesMut<'_>,
+        event: &masonry::core::TextEvent,
+    ) {
+        if let masonry::core::TextEvent::Keyboard(key_event) = event {
+            if key_event.state.is_down() {
+                ctx.submit_action(EditorAction::KeyPress(key_event.key.clone()));
+            } else {
+                ctx.submit_action(EditorAction::KeyRelease(key_event.key.clone()));
+            }
+        }
+    }
+
+    fn accepts_focus(&self) -> bool {
+        true
+    }
+
+    fn accepts_text_input(&self) -> bool {
+        true
+    }
+
     fn get_debug_text(&self) -> Option<String> {
         "EditorPortal".to_string().into()
     }
@@ -246,7 +247,7 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         app_state: &mut EditorState,
     ) -> (Self::Element, Self::ViewState) {
         (
-            ctx.with_action_widget(|_| (Pod::new(EditorPortal::new(app_state)))),
+            ctx.with_action_widget(|_| (Pod::new(EditorPortal::new(app_state.clone())))),
             (),
         )
     }
@@ -259,7 +260,7 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         mut element: xilem::core::Mut<Self::Element>,
         app_state: &mut EditorState,
     ) {
-        *element.widget = EditorPortal::new(app_state);
+        *element.widget = EditorPortal::new(app_state.clone());
         element.ctx.request_render();
     }
 
@@ -282,7 +283,16 @@ impl View<EditorState, (), ViewCtx> for EditorView {
     ) -> xilem::core::MessageResult<()> {
         if let Ok(editor_action) = message.downcast::<EditorAction>() {
             match editor_action.as_ref() {
-                EditorAction::KeyPress(key_code) => MessageResult::Nop,
+                EditorAction::KeyPress(key_code) => {
+                    app_state.press_key(key_code.clone());
+                    app_state.handle_keybind();
+                    MessageResult::Nop
+                }
+                EditorAction::KeyRelease(key_code) => {
+                    app_state.release_key(key_code.clone());
+                    app_state.handle_keybind();
+                    MessageResult::Nop
+                }
                 EditorAction::Scroll { delta, document } => {
                     app_state.scroll_document(&document.path, (delta.0, delta.1));
                     MessageResult::RequestRebuild
@@ -304,7 +314,8 @@ impl View<EditorState, (), ViewCtx> for EditorView {
 
 #[derive(Debug)]
 enum EditorAction {
-    KeyPress(KeyCode),
+    KeyPress(Key),
+    KeyRelease(Key),
     Scroll {
         delta: (f64, f64),
         document: Document,
