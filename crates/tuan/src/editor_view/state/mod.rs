@@ -6,5 +6,6 @@ mod styles;
 mod open;
 mod keybinds;
 mod masonry_keybinds_converter;
+mod action;
 
 pub use state::*;

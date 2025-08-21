@@ -5,6 +5,7 @@ use keybinds::KeyInput;
 use masonry::core::{Modifiers, keyboard::Key};
 use serde::Deserialize;
 use std::fs;
+use super::action::EditorAction;
 
 #[derive(Clone)]
 pub(super) struct Keybinds {
@@ -44,20 +45,6 @@ impl super::EditorState {
             self.handle_action(&action);
         }
     }
-
-    fn handle_action(&mut self, action: &EditorAction) {
-        match action {
-            EditorAction::CursorLeft => {
-                if let Some(focused_path) = &self.focused_document_path {
-                    if let Some(cursors) = self.document_cursors.get_mut(focused_path) {
-                        for cursor in cursors {
-                            cursor.move_left(1);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,9 +56,4 @@ struct KeybindsConfig {
 struct KeybindConfig {
     pub key: String,
     pub action: EditorAction,
-}
-
-#[derive(PartialEq, Eq, Debug, Deserialize, Clone)]
-enum EditorAction {
-    CursorLeft,
 }

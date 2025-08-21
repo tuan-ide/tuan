@@ -3,6 +3,18 @@
     {
       "key": "Left",
       "action": "CursorLeft"
+    },
+    {
+      "key": "Right",
+      "action": "CursorRight"
+    },
+    {
+      "key": "Up",
+      "action": "CursorUp"
+    },
+    {
+      "key": "Down",
+      "action": "CursorDown"
     }
   ]
 }

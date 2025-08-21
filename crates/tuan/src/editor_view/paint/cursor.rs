@@ -106,10 +106,12 @@ impl Cursor {
 
     pub fn move_right(&mut self, chars: usize) {
         self.column += chars;
+        self.set_blink_state(BlinkState::Move);
     }
 
     pub fn move_down(&mut self, lines: usize) {
         self.line += lines;
+        self.set_blink_state(BlinkState::Move);
     }
 
     pub fn move_up(&mut self, lines: usize) {
@@ -118,5 +120,6 @@ impl Cursor {
         } else {
             self.line = 0;
         }
+        self.set_blink_state(BlinkState::Move);
     }
 }
