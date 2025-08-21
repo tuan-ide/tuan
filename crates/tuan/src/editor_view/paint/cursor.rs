@@ -1,4 +1,8 @@
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use masonry::kurbo::Rect;
 use tuan_core::buffer::rope_text::RopeText;
@@ -17,13 +21,14 @@ pub enum BlinkState {
     Move,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Cursor {
     pub line: usize,
     pub column: usize,
     pub blink_state: BlinkState,
     editor_config: Arc<EditorConfig>,
-    document: document::Document,
+    documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
+    focused_document_path: Option<PathBuf>,
 }
 
 impl Cursor {
@@ -73,13 +78,15 @@ impl Cursor {
     pub fn new(
         line: usize,
         column: usize,
-        document: document::Document,
+        documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
+        focused_document_path: Option<PathBuf>,
         editor_config: Arc<EditorConfig>,
     ) -> Self {
         Self {
             line,
             column,
-            document,
+            documents,
+            focused_document_path,
             blink_state: BlinkState::On,
             editor_config,
         }
@@ -104,12 +111,25 @@ impl Cursor {
 }
 
 impl Cursor {
+    fn get_document(&self) -> Option<document::Document> {
+        self.documents
+            .lock()
+            .unwrap()
+            .get(&self.focused_document_path.clone()?)
+            .cloned()
+    }
+}
+
+impl Cursor {
     fn get_min_x(&self) -> usize {
         0
     }
 
     fn get_max_x(&self) -> usize {
-        self.document.get_line_length(self.line).saturating_sub(1)
+        self.get_document()
+            .map(|doc| doc.get_line_length(self.line))
+            .unwrap_or(0)
+            .saturating_sub(1)
     }
 
     fn get_min_y(&self) -> usize {
@@ -117,7 +137,10 @@ impl Cursor {
     }
 
     fn get_max_y(&self) -> usize {
-        self.document.count_lines().saturating_sub(1)
+        self.get_document()
+            .map(|doc| doc.count_lines())
+            .unwrap_or(0)
+            .saturating_sub(1)
     }
 
     pub fn move_x_at(&mut self, chars: usize) {
@@ -135,6 +158,8 @@ impl Cursor {
 
 impl Cursor {
     pub fn get_cursor_offset(&self) -> usize {
-        self.document.buffer.offset_of_line(self.line) + self.column
+        self.get_document()
+            .map(|doc| doc.buffer.offset_of_line(self.line) + self.column)
+            .unwrap_or(0)
     }
 }

@@ -82,17 +82,16 @@ impl Document {
         self.buffer.num_lines()
     }
 
-    pub fn insert_character_at(&mut self, cursor: &Cursor, c: &str) {
+    pub fn insert_character_at(&mut self, position: usize, c: &str) {
         self.buffer.edit(
-            [(Selection::caret(cursor.get_cursor_offset()), c)],
+            [(Selection::caret(position), c)],
             tuan_core::editor::EditType::InsertChars,
         );
     }
 
-    pub fn delete_character_at(&mut self, cursor: &Cursor) {
-        let offset = cursor.get_cursor_offset();
+    pub fn delete_character_at(&mut self, position: usize) {
         self.buffer.edit(
-            [(Selection::region(offset - 1, offset), "")],
+            [(Selection::region(position - 1, position), "")],
             tuan_core::editor::EditType::DeleteSelection,
         );
     }

@@ -1,5 +1,3 @@
-use crate::editor_view::paint::cursor::Cursor;
-
 impl super::EditorState {
     pub fn insert_character(&mut self, ch: char) {
         let focused_document_path = match self.focused_document_path.clone() {
@@ -7,22 +5,29 @@ impl super::EditorState {
             None => return,
         };
 
+        let cursors = self
+            .document_cursors
+            .get(&focused_document_path)
+            .cloned()
+            .unwrap_or_default();
+
+        let positions = cursors
+            .iter()
+            .map(|c| c.get_cursor_offset())
+            .collect::<Vec<_>>();
+
         let mut documents = self.documents.lock().unwrap();
         let document = match documents.get_mut(&focused_document_path) {
             Some(d) => d,
             None => return,
         };
 
-        let cursors: Vec<Cursor> = self
-            .document_cursors
-            .get(&focused_document_path)
-            .cloned()
-            .unwrap_or_default();
-
         let s = ch.to_string();
-        for cursor in &cursors {
-            document.insert_character_at(cursor, &s);
+        for position in positions {
+            document.insert_character_at(position, &s);
         }
+
+        drop(documents);
 
         if let Some(cursors) = self.document_cursors.get_mut(&focused_document_path) {
             for c in cursors {
@@ -37,21 +42,28 @@ impl super::EditorState {
             None => return,
         };
 
+        let cursors = self
+            .document_cursors
+            .get(&focused_document_path)
+            .cloned()
+            .unwrap_or_default();
+
+        let positions = cursors
+            .iter()
+            .map(|c| c.get_cursor_offset())
+            .collect::<Vec<_>>();
+
         let mut documents = self.documents.lock().unwrap();
         let document = match documents.get_mut(&focused_document_path) {
             Some(d) => d,
             None => return,
         };
 
-        let cursors: Vec<Cursor> = self
-            .document_cursors
-            .get(&focused_document_path)
-            .cloned()
-            .unwrap_or_default();
-
-        for cursor in &cursors {
-            document.delete_character_at(cursor);
+        for position in positions {
+            document.delete_character_at(position);
         }
+
+        drop(documents);
 
         if let Some(cursors) = self.document_cursors.get_mut(&focused_document_path) {
             for c in cursors {
