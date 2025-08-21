@@ -89,6 +89,14 @@ impl Document {
         );
     }
 
+    pub fn delete_character_at(&mut self, cursor: &Cursor) {
+        let offset = cursor.get_cursor_offset();
+        self.buffer.edit(
+            [(Selection::region(offset - 1, offset), "")],
+            tuan_core::editor::EditType::DeleteSelection,
+        );
+    }
+
     pub fn update_styles_with_syntax(&mut self) {
         let mut syntax = Syntax::init(&self.path);
         syntax.parse(1, self.buffer.text().clone(), None);

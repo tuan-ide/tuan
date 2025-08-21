@@ -30,4 +30,33 @@ impl super::EditorState {
             }
         }
     }
+
+    pub fn delete_character(&mut self) {
+        let focused_document_path = match self.focused_document_path.clone() {
+            Some(p) => p,
+            None => return,
+        };
+
+        let mut documents = self.documents.lock().unwrap();
+        let document = match documents.get_mut(&focused_document_path) {
+            Some(d) => d,
+            None => return,
+        };
+
+        let cursors: Vec<Cursor> = self
+            .document_cursors
+            .get(&focused_document_path)
+            .cloned()
+            .unwrap_or_default();
+
+        for cursor in &cursors {
+            document.delete_character_at(cursor);
+        }
+
+        if let Some(cursors) = self.document_cursors.get_mut(&focused_document_path) {
+            for c in cursors {
+                c.move_x_at(c.column - 1);
+            }
+        }
+    }
 }

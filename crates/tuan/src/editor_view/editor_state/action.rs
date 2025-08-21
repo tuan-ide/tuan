@@ -10,7 +10,8 @@ pub enum EditorAction {
     CursorStart,
     CursorEnd,
     CursorTop,
-    CursorBottom
+    CursorBottom,
+    DeleteChar
 }
 
 impl super::EditorState {
@@ -71,6 +72,9 @@ impl super::EditorState {
                         cursor.move_y_at(usize::MAX);
                     }
                 });
+            }
+            EditorAction::DeleteChar => {
+                self.delete_character();
             }
         }
     }

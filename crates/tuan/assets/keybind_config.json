@@ -31,6 +31,10 @@
     {
       "key": "Cmd+Down",
       "action": "CursorBottom"
+    },
+    {
+      "key": "Backspace",
+      "action": "DeleteChar"
     }
   ]
 }
