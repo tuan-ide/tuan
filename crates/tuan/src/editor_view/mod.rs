@@ -1,6 +1,7 @@
 mod state;
 mod view;
 mod config;
+pub(super) mod action;
 pub(super) mod line;
 pub(super) mod cursor;
 

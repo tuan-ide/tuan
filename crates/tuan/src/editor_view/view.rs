@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use super::line::Line;
-use crate::editor_view::EditorState;
+use crate::editor_view::{EditorState, action::EditorAction};
 use masonry::{
     accesskit::Role,
     core::{ScrollDelta, Widget},
@@ -10,7 +10,7 @@ use masonry::{
 use winit::dpi::LogicalPosition;
 use xilem::{
     Pod, ViewCtx, WidgetView,
-    core::{View, ViewMarker, fork},
+    core::{MessageResult, View, ViewMarker, fork},
     tokio,
     view::{button, flex, task},
 };
@@ -91,9 +91,20 @@ impl Widget for EditorPortal {
         props: &masonry::core::PropertiesRef<'_>,
         scene: &mut masonry::vello::Scene,
     ) {
+        let document = self
+            .with_state(|state| state.get_focused_document())
+            .flatten();
+
+        if document.is_none() {
+            tracing::debug!("No focused document to paint");
+            return;
+        }
+        let mut document = document.unwrap();
+
         let size = ctx.size();
+
         let scroll_delta = self
-            .with_state(|state| state.get_focused_document_scroll())
+            .with_state(|state| state.get_document_scroll(&document.path))
             .flatten()
             .unwrap_or((0.0, 0.0));
         let viewport = Rect::new(
@@ -103,34 +114,28 @@ impl Widget for EditorPortal {
             size.height - scroll_delta.1,
         );
 
-        let document = self
-            .with_state(|state| state.get_focused_document())
-            .flatten();
+        document.update_styles_with_syntax();
+        self.y_to_line_mapping.clear();
 
-        if let Some(mut document) = document {
-            document.update_styles_with_syntax();
-            self.y_to_line_mapping.clear();
+        let lines = document.get_visible_lines(viewport);
+        let cursors = self
+            .with_state(|state| state.get_document_cursors(&document.path))
+            .flatten()
+            .unwrap_or_else(Vec::new);
 
-            let lines = document.get_visible_lines(viewport);
-            let cursors = self
-                .with_state(|state| state.get_focused_document_cursors())
-                .flatten()
-                .unwrap_or_else(Vec::new);
+        let config = self.with_state(|state| state.config.clone()).unwrap();
+        let lines = lines
+            .into_iter()
+            .map(|line| Line::new(&config, &line, &document, ctx, cursors.clone()))
+            .collect::<Vec<_>>();
 
-            let config = self.with_state(|state| state.config.clone()).unwrap();
-            let lines = lines
-                .into_iter()
-                .map(|line| Line::new(&config, &line, &document, ctx, cursors.clone()))
-                .collect::<Vec<_>>();
+        for cursor in cursors {
+            cursor.paint(scene, scroll_delta, &lines);
+        }
 
-            for cursor in cursors {
-                cursor.paint(scene, scroll_delta, &lines);
-            }
-
-            for line in &lines {
-                let (y_min, y_max) = line.paint(scene, scroll_delta);
-                self.y_to_line_mapping.push((y_min, y_max, line.clone()));
-            }
+        for line in &lines {
+            let (y_min, y_max) = line.paint(scene, scroll_delta);
+            self.y_to_line_mapping.push((y_min, y_max, line.clone()));
         }
     }
 
@@ -169,10 +174,15 @@ impl Widget for EditorPortal {
                 state,
             } => {
                 if let ScrollDelta::PixelDelta(delta) = delta {
-                    self.with_state(|state| {
-                        state.scroll_focused_document((delta.x, delta.y));
-                    });
-                    ctx.request_render();
+                    if let Some(focused_document) = self
+                        .with_state(|state| state.get_focused_document())
+                        .flatten()
+                    {
+                        ctx.submit_action(EditorAction::Scroll {
+                            delta: (delta.x, delta.y),
+                            document: focused_document,
+                        });
+                    }
                 }
             }
             masonry::core::PointerEvent::Down {
@@ -180,8 +190,13 @@ impl Widget for EditorPortal {
                 button,
                 state,
             } => {
+                let focused_document = self
+                    .with_state(|state| state.get_focused_document())
+                    .flatten()
+                    .expect("Focused document should not be None");
+
                 let scroll_delta = self
-                    .with_state(|state| state.get_focused_document_scroll())
+                    .with_state(|state| state.get_document_scroll(&focused_document.path))
                     .flatten()
                     .unwrap_or((0.0, 0.0));
 
@@ -203,12 +218,13 @@ impl Widget for EditorPortal {
                     })
                     .unwrap_or((0, 0));
 
-                self.with_state(|state| {
-                    state.clear_cursors_from_focused_document();
-                    state.add_cursor_to_focused_document((line_number, char_index));
+                ctx.submit_action(EditorAction::ClearCursors {
+                    document: focused_document.clone(),
                 });
-
-                ctx.request_render();
+                ctx.submit_action(EditorAction::AddCursor {
+                    document: focused_document,
+                    position: (line_number, char_index),
+                });
             }
             _ => {}
         }
@@ -230,7 +246,10 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         ctx: &mut ViewCtx,
         app_state: &mut EditorState,
     ) -> (Self::Element, Self::ViewState) {
-        (ctx.create_pod(EditorPortal::new(app_state)), ())
+        (
+            ctx.with_action_widget(|_| (Pod::new(EditorPortal::new(app_state)))),
+            (),
+        )
     }
 
     fn rebuild(
@@ -262,6 +281,24 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         message: xilem::core::DynMessage,
         app_state: &mut EditorState,
     ) -> xilem::core::MessageResult<()> {
-        unreachable!("message should not be sent to EditorView without child.");
+        if let Ok(editor_action) = message.downcast::<EditorAction>() {
+            match editor_action.as_ref() {
+                EditorAction::KeyPress(key_code) => MessageResult::Nop,
+                EditorAction::Scroll { delta, document } => {
+                    app_state.scroll_document(&document.path, (delta.0, delta.1));
+                    MessageResult::RequestRebuild
+                }
+                EditorAction::AddCursor { document, position } => {
+                    app_state.add_cursor(document.path.clone(), position);
+                    MessageResult::RequestRebuild
+                }
+                EditorAction::ClearCursors { document } => {
+                    app_state.clear_cursors(document.path.clone());
+                    MessageResult::RequestRebuild
+                }
+            }
+        } else {
+            MessageResult::Nop
+        }
     }
 }

@@ -145,65 +145,37 @@ impl EditorState {
         focused_path.and_then(|path| self.documents.lock().unwrap().get(&path).cloned())
     }
 
-    pub fn scroll_focused_document(&mut self, delta: (f64, f64)) {
-        if let Some(focused_path) = &self.focused_document_path {
-            let (x, y) = self
-                .document_scrollings
-                .entry(focused_path.clone())
-                .or_insert((0.0, 0.0));
-            *x += delta.0;
-            *y += delta.1;
-        } else {
-            tracing::debug!("No focused document to scroll");
-        }
+    pub fn scroll_document(&mut self, path: &PathBuf, delta: (f64, f64)) {
+        let (x, y) = self
+            .document_scrollings
+            .entry(path.clone())
+            .or_insert((0.0, 0.0));
+        *x += delta.0;
+        *y += delta.1;
     }
 
     pub fn get_document_scroll(&self, path: &PathBuf) -> Option<(f64, f64)> {
         self.document_scrollings.get(path).cloned()
     }
 
-    pub fn get_focused_document_scroll(&self) -> Option<(f64, f64)> {
-        self.focused_document_path
-            .as_ref()
-            .and_then(|path| self.get_document_scroll(path))
-    }
-
     pub fn get_document_cursors(&self, path: &PathBuf) -> Option<Vec<cursor::Cursor>> {
         self.document_cursors.get(path).cloned()
     }
 
-    pub fn get_focused_document_cursors(&self) -> Option<Vec<cursor::Cursor>> {
-        self.focused_document_path
-            .as_ref()
-            .and_then(|path| self.get_document_cursors(path))
-    }
-
-    pub fn add_cursor(&mut self, path: PathBuf, position: (usize, usize)) {
+    pub fn add_cursor(&mut self, path: PathBuf, position: &(usize, usize)) {
         self.document_cursors
             .entry(path)
             .or_insert_with(Vec::new)
-            .push(cursor::Cursor::new(position.0, position.1, self.config.clone()));
-    }
-
-    pub fn add_cursor_to_focused_document(&mut self, position: (usize, usize)) {
-        if let Some(focused_path) = &self.focused_document_path {
-            self.add_cursor(focused_path.clone(), position);
-        } else {
-            tracing::debug!("No focused document to add cursor");
-        }
+            .push(cursor::Cursor::new(
+                position.0,
+                position.1,
+                self.config.clone(),
+            ));
     }
 
     pub fn clear_cursors(&mut self, path: PathBuf) {
         if let Some(cursors) = self.document_cursors.get_mut(&path) {
             cursors.clear();
-        }
-    }
-
-    pub fn clear_cursors_from_focused_document(&mut self) {
-        if let Some(focused_path) = &self.focused_document_path {
-            self.clear_cursors(focused_path.clone());
-        } else {
-            tracing::debug!("No focused document to clear cursors");
         }
     }
 

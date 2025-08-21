@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
 use masonry::kurbo::Rect;
 use tuan_core::syntax::Syntax;
@@ -16,12 +16,23 @@ pub struct RangeStyle {
     pub style: theme::Style,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Document {
-    path: PathBuf,
+    pub(crate) path: PathBuf,
     buffer: buffer::Buffer,
     config: Arc<editor_view::EditorConfig>,
     styles: Vec<RangeStyle>,
+}
+
+impl Debug for Document {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Document")
+            .field("path", &self.path)
+            .field("buffer", &self.buffer.text.len())
+            .field("config", &"&self.config")
+            .field("styles", &self.styles.len())
+            .finish()
+    }
 }
 
 impl Document {
