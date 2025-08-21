@@ -1,0 +1,40 @@
+{
+  "keybindings": [
+    {
+      "key": "Left",
+      "action": "CursorLeft"
+    },
+    {
+      "key": "Right",
+      "action": "CursorRight"
+    },
+    {
+      "key": "Up",
+      "action": "CursorUp"
+    },
+    {
+      "key": "Down",
+      "action": "CursorDown"
+    },
+    {
+      "key": "Cmd+Left",
+      "action": "CursorStart"
+    },
+    {
+      "key": "Cmd+Right",
+      "action": "CursorEnd"
+    },
+    {
+      "key": "Cmd+Up",
+      "action": "CursorTop"
+    },
+    {
+      "key": "Cmd+Down",
+      "action": "CursorBottom"
+    },
+    {
+      "key": "Backspace",
+      "action": "DeleteChar"
+    }
+  ]
+}

@@ -1,43 +1,52 @@
-// Copyright 2024 the Xilem Authors
-// SPDX-License-Identifier: Apache-2.0
+use std::sync::Arc;
 
-//! Flex properties can be set in Xilem.
-
-use masonry::widgets::{CrossAxisAlignment, MainAxisAlignment};
 use winit::error::EventLoopError;
-use xilem::view::{FlexExt as _, FlexSpacer, Label, button, flex_row, label, sized_box};
-use xilem::{EventLoop, WidgetView, WindowOptions, Xilem};
+use xilem::{EventLoop, WidgetView, WindowOptions, Xilem, core::lens};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod editor;
+use crate::editor_view::{EditorConfig, EditorState, editor_view};
 
-/// A component to make a bigger than usual button
-fn big_button(
-    label: impl Into<Label>,
-    callback: impl Fn(&mut i32) + Send + Sync + 'static,
-) -> impl WidgetView<i32> {
-    sized_box(button(label, callback)).width(40.).height(40.)
+mod document;
+mod editor_view;
+mod globals;
+mod proxy;
+mod terminal;
+mod workspace;
+mod theme;
+mod keybindings;
+
+pub struct AppState {
+    editor_state: EditorState,
 }
 
-fn app_logic(data: &mut i32) -> impl WidgetView<i32> + use<> {
-    flex_row((
-        FlexSpacer::Fixed(30.0),
-        big_button("-", |data| {
-            *data -= 1;
-        }),
-        FlexSpacer::Flex(1.0),
-        label(format!("count: {data}")).text_size(32.).flex(5.0),
-        FlexSpacer::Flex(1.0),
-        big_button("+", |data| {
-            *data += 1;
-        }),
-        FlexSpacer::Fixed(30.0),
-    ))
-    .cross_axis_alignment(CrossAxisAlignment::Center)
-    .main_axis_alignment(MainAxisAlignment::Center)
+impl AppState {
+    fn new() -> Self {
+        Self {
+            editor_state: EditorState::new(
+                "/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie".into(),
+                Arc::new(EditorConfig::default()),
+            ),
+        }
+    }
+}
+
+fn app_logic(data: &mut AppState) -> impl WidgetView<AppState> + use<> {
+    lens(editor_view, |s: &mut AppState| &mut s.editor_state)
 }
 
 fn main() -> Result<(), EventLoopError> {
-    let app = Xilem::new_simple(0, app_logic, WindowOptions::new("Centered Flex"));
+    // Initialize tracing with a filter to reduce debug noise
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| {
+                    tracing_subscriber::EnvFilter::new("warn,tuan=debug")
+                })
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    let app = Xilem::new_simple(AppState::new(), app_logic, WindowOptions::new("Tuan"));
     app.run_in(EventLoop::with_user_event())?;
     Ok(())
 }
