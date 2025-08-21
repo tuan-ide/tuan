@@ -2,7 +2,7 @@ use crate::editor_view::paint::cursor::Cursor;
 use serde::Deserialize;
 
 #[derive(PartialEq, Eq, Debug, Deserialize, Clone)]
-pub(super) enum EditorAction {
+pub enum EditorAction {
     CursorLeft,
     CursorRight,
     CursorUp,
@@ -10,7 +10,7 @@ pub(super) enum EditorAction {
 }
 
 impl super::EditorState {
-    pub(super) fn handle_action(&mut self, action: &EditorAction) {
+    pub fn handle_action(&mut self, action: &EditorAction) {
         match action {
             EditorAction::CursorLeft => {
                 self.with_cursors_mut(|cursors| {

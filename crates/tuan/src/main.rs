@@ -13,6 +13,7 @@ mod proxy;
 mod terminal;
 mod workspace;
 mod theme;
+mod keybindings;
 
 pub struct AppState {
     editor_state: EditorState,

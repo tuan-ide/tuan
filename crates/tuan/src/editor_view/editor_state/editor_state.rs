@@ -1,12 +1,11 @@
+use crate::keybindings::Keybindings;
 use crate::{
     document,
     editor_view::{EditorConfig, paint::cursor},
     proxy, workspace,
 };
-use super::keybinds::Keybinds;
-use masonry::core::keyboard::Key;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -14,12 +13,12 @@ use std::{
 #[derive(Clone)]
 pub struct EditorState {
     pub(super) proxy: proxy::ProxyData,
-    pub(super) keybinds: Keybinds,
     pub config: Arc<EditorConfig>,
     pub documents: Arc<Mutex<HashMap<PathBuf, document::Document>>>,
     pub focused_document_path: Option<PathBuf>,
     pub document_scrollings: HashMap<PathBuf, (f64, f64)>,
     pub document_cursors: HashMap<PathBuf, Vec<cursor::Cursor>>,
+    pub keybindings: Keybindings,
 }
 
 impl EditorState {
@@ -33,7 +32,7 @@ impl EditorState {
 
         let proxy = proxy::new_proxy(workspace, vec![], vec![], HashMap::new(), term_tx);
 
-        let keybinds = Keybinds::new().expect("Failed to create keybinds");
+        let keybinds = Keybindings::new().expect("Failed to create keybinds");
 
         // Spawn a thread to log all data received in proxy.notification_rx
         std::thread::spawn({
@@ -87,7 +86,7 @@ impl EditorState {
 
         Self {
             proxy,
-            keybinds,
+            keybindings: keybinds,
             config: editor_config,
             documents: Arc::new(Mutex::new(HashMap::new())),
             focused_document_path: None,
