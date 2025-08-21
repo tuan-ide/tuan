@@ -1,13 +1,12 @@
-use std::time::Duration;
-
-use super::line::Line;
-use crate::editor_view::{EditorState, action::EditorAction};
+use super::paint::line::Line;
+use crate::{document::Document, editor_view::EditorState};
 use masonry::{
     accesskit::Role,
     core::{ScrollDelta, Widget},
     kurbo::Rect,
 };
-use winit::dpi::LogicalPosition;
+use std::time::Duration;
+use winit::{dpi::LogicalPosition, keyboard::KeyCode};
 use xilem::{
     Pod, ViewCtx, WidgetView,
     core::{MessageResult, View, ViewMarker, fork},
@@ -301,4 +300,20 @@ impl View<EditorState, (), ViewCtx> for EditorView {
             MessageResult::Nop
         }
     }
+}
+
+#[derive(Debug)]
+enum EditorAction {
+    KeyPress(KeyCode),
+    Scroll {
+        delta: (f64, f64),
+        document: Document,
+    },
+    AddCursor {
+        document: Document,
+        position: (usize, usize),
+    },
+    ClearCursors {
+        document: Document,
+    },
 }

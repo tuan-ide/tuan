@@ -16,14 +16,45 @@ use xilem::{Affine, Color, FontWeight, TextAlign};
 use super::cursor;
 
 #[derive(Clone)]
-pub(super) struct Line {
+pub(crate) struct Line {
     editor_config: EditorConfig,
     /// (start, end, index)
     x_to_character_index_mapping: Vec<(f32, f32, usize)>,
     text_layout: masonry::parley::Layout<BrushIndex>,
     brushes: Vec<Brush>,
     baseline: f32,
-    pub(super) line: document::line::Line,
+    pub(crate) line: document::line::Line,
+}
+
+impl Line {
+    pub(crate) fn paint(
+        &self,
+        scene: &mut masonry::vello::Scene,
+        scroll_delta: (f64, f64),
+    ) -> (f64, f64) {
+        let line = &self.line;
+        let text_layout = &self.text_layout;
+        let brushes = &self.brushes;
+        let line_height = self.editor_config.real_line_height();
+
+        // The vertical shift to center the text within the line height.
+        let y_line_height_adjustment = (line_height - self.baseline) / 2.0;
+
+        let y_min = line.line_number as f64 * line_height as f64 + y_line_height_adjustment as f64;
+        let y_max = y_min + line_height as f64 + y_line_height_adjustment as f64;
+
+        let transform = Affine::translate((scroll_delta.0, scroll_delta.1 + y_min));
+
+        masonry::core::render_text(
+            scene,
+            transform,
+            &text_layout,
+            &brushes,
+            true, // hinting
+        );
+
+        return (y_min, y_max);
+    }
 }
 
 impl Line {
@@ -152,35 +183,6 @@ impl Line {
             x_to_character_index_mapping,
             max_baseline,
         )
-    }
-
-    pub(super) fn paint(
-        &self,
-        scene: &mut masonry::vello::Scene,
-        scroll_delta: (f64, f64),
-    ) -> (f64, f64) {
-        let line = &self.line;
-        let text_layout = &self.text_layout;
-        let brushes = &self.brushes;
-        let line_height = self.editor_config.real_line_height();
-
-        // The vertical shift to center the text within the line height.
-        let y_line_height_adjustment = (line_height - self.baseline) / 2.0;
-
-        let y_min = line.line_number as f64 * line_height as f64 + y_line_height_adjustment as f64;
-        let y_max = y_min + line_height as f64 + y_line_height_adjustment as f64;
-
-        let transform = Affine::translate((scroll_delta.0, scroll_delta.1 + y_min));
-
-        masonry::core::render_text(
-            scene,
-            transform,
-            &text_layout,
-            &brushes,
-            true, // hinting
-        );
-
-        return (y_min, y_max);
     }
 
     pub fn get_clicked_character_index(&self, x: f32) -> Option<usize> {

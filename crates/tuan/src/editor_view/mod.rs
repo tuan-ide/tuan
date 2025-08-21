@@ -1,10 +1,8 @@
 mod state;
-mod view;
-mod config;
-pub(super) mod action;
-pub(super) mod line;
-pub(super) mod cursor;
+mod editor_view;
+mod editor_config;
+pub(super) mod paint;
 
 pub use state::EditorState;
-pub use view::editor_view;
-pub use config::EditorConfig;
+pub use editor_view::editor_view;
+pub use editor_config::EditorConfig;

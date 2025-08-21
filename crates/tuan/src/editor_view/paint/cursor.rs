@@ -3,9 +3,10 @@ use std::sync::Arc;
 use masonry::kurbo::Rect;
 use xilem::{Affine, Color};
 
-use crate::theme::{self, theme::Theme};
-
-use super::{config::EditorConfig, line};
+use crate::{
+    editor_view::{EditorConfig, paint::line},
+    theme::{self, theme::Theme},
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BlinkState {
@@ -22,34 +23,7 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn new(line: usize, column: usize, editor_config: Arc<EditorConfig>) -> Self {
-        Self {
-            line,
-            column,
-            blink_state: BlinkState::On,
-            editor_config,
-        }
-    }
-
-    fn set_blink_state(&mut self, state: BlinkState) {
-        self.blink_state = state;
-    }
-
-    fn next_blink_state(&mut self) {
-        let new_state = match self.blink_state {
-            BlinkState::On => BlinkState::Off,
-            BlinkState::Off => BlinkState::On,
-        };
-        self.set_blink_state(new_state);
-    }
-
-    pub fn tick(&mut self) {
-        self.next_blink_state();
-    }
-}
-
-impl Cursor {
-    pub(super) fn paint(
+    pub(crate) fn paint(
         &self,
         scene: &mut masonry::vello::Scene,
         scroll_delta: (f64, f64),
@@ -87,5 +61,32 @@ impl Cursor {
         );
 
         Some(())
+    }
+}
+
+impl Cursor {
+    pub fn new(line: usize, column: usize, editor_config: Arc<EditorConfig>) -> Self {
+        Self {
+            line,
+            column,
+            blink_state: BlinkState::On,
+            editor_config,
+        }
+    }
+
+    fn set_blink_state(&mut self, state: BlinkState) {
+        self.blink_state = state;
+    }
+
+    fn next_blink_state(&mut self) {
+        let new_state = match self.blink_state {
+            BlinkState::On => BlinkState::Off,
+            BlinkState::Off => BlinkState::On,
+        };
+        self.set_blink_state(new_state);
+    }
+
+    pub fn tick(&mut self) {
+        self.next_blink_state();
     }
 }
