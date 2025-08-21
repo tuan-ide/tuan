@@ -6,5 +6,6 @@ mod styles;
 mod open;
 mod keybindings;
 pub(crate) mod action;
+mod editing;
 
 pub use editor_state::*;

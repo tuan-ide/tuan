@@ -1,11 +1,11 @@
 use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
 use masonry::kurbo::Rect;
-use tuan_core::{buffer::rope_text::RopeText, syntax::Syntax};
+use tuan_core::{buffer::rope_text::RopeText, selection::Selection, syntax::Syntax};
 
 use super::line;
 use crate::{
-    editor_view,
+    editor_view::{self, paint::cursor::Cursor},
     theme::{self, theme::Theme as _},
 };
 
@@ -19,7 +19,7 @@ pub struct RangeStyle {
 #[derive(Clone)]
 pub struct Document {
     pub(crate) path: PathBuf,
-    buffer: tuan_core::buffer::Buffer,
+    pub(crate) buffer: tuan_core::buffer::Buffer,
     config: Arc<editor_view::EditorConfig>,
     styles: Vec<RangeStyle>,
 }
@@ -80,6 +80,13 @@ impl Document {
 
     pub fn count_lines(&self) -> usize {
         self.buffer.num_lines()
+    }
+
+    pub fn insert_character_at(&mut self, cursor: &Cursor, c: &str) {
+        self.buffer.edit(
+            [(Selection::caret(cursor.get_cursor_offset()), c)],
+            tuan_core::editor::EditType::InsertChars,
+        );
     }
 
     pub fn update_styles_with_syntax(&mut self) {

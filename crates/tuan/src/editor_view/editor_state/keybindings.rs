@@ -1,4 +1,4 @@
-use keybinds::KeyInput;
+use keybinds::{KeyInput, Key as KeybindsKey};
 use masonry::core::{Modifiers, keyboard::Key};
 
 use crate::keybindings;
@@ -20,6 +20,9 @@ impl super::EditorState {
 
         if let Some(action) = action {
             self.handle_action(&action);
+        } else if modifiers == Modifiers::empty() && let KeybindsKey::Char(c) = key {
+            tracing::debug!("Insert character: {:?}", c);
+            self.insert_character(c);
         }
     }
 }

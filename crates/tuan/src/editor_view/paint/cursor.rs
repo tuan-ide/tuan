@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use masonry::kurbo::Rect;
+use tuan_core::buffer::rope_text::RopeText;
 use xilem::{Affine, Color};
 
 use crate::{
@@ -129,5 +130,11 @@ impl Cursor {
         self.line = lines.clamp(self.get_min_y(), self.get_max_y());
         self.column = self.column.clamp(self.get_min_x(), self.get_max_x());
         self.set_blink_state(BlinkState::Move);
+    }
+}
+
+impl Cursor {
+    pub fn get_cursor_offset(&self) -> usize {
+        self.document.buffer.offset_of_line(self.line) + self.column
     }
 }
