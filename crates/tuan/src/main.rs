@@ -8,6 +8,8 @@ use crate::editor_view::{EditorConfig, EditorState, editor_view};
 
 mod document;
 mod editor_view;
+mod graph_view;
+mod file;
 mod globals;
 mod proxy;
 mod terminal;

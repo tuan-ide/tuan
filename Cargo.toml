@@ -27,3 +27,4 @@ tuan-core = { git = "https://github.com/tuan-ide/tuan-proxy", package = "lapce-c
 dirs = { version = "6.0.0" }
 hex_color = { version = "3.0.0" }
 keybinds = { version = "0.2.0", features = ["winit"] }
+fdg-sim = { version = "0.9.1" }
