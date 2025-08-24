@@ -16,6 +16,7 @@ mod terminal;
 mod workspace;
 mod theme;
 mod keybindings;
+mod languages;
 
 pub struct AppState {
     editor_state: EditorState,
