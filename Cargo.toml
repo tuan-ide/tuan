@@ -32,6 +32,7 @@ oxc = { version = "0.75.1" }
 oxc_ast_visit = { version = "0.75.1" }
 oxc_ast = { version = "0.75.1" }
 oxc_parser = { version = "0.75.1" }
+oxc_resolver = { version = "11.7.1" }
 oxc_semantic = { version = "0.75.1" }
 oxc_span = { version = "0.75.1" }
 oxc_allocator = { version = "0.75.1" }

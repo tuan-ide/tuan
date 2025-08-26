@@ -1,6 +1,4 @@
-use crate::graph_view::{Graph, GraphFeeder as _};
 use crate::keybindings::Keybindings;
-use crate::languages::typescript::TypescriptProject;
 use crate::{
     document,
     editor_view::{EditorConfig, paint::cursor},
@@ -25,11 +23,6 @@ pub struct EditorState {
 
 impl EditorState {
     pub fn new(workspace_path: PathBuf, editor_config: Arc<EditorConfig>) -> Self {
-        let mut graph = Graph::new();
-        let typescript_project = TypescriptProject::new(workspace_path.clone());
-        typescript_project.feed_graph(&mut graph);
-        graph.log();
-
         let workspace = Arc::new(workspace::LapceWorkspace {
             kind: workspace::LapceWorkspaceType::Local,
             path: Some(workspace_path),

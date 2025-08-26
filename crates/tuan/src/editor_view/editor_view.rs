@@ -20,13 +20,16 @@ use xilem::{
 };
 
 pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
-    state.open_file("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
+    state.open_file(
+        "/Users/arthur-fontaine/Developer/code/github.com/arthur-fontaine/agrume/package.json"
+            .into(),
+    );
 
     fork(
         // TODO: remove the flex box and the Open File button, those are just for testing
         flex((
             button("Open File", |state: &mut EditorState| {
-                state.focus_document("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
+                state.focus_document("/Users/arthur-fontaine/Developer/code/github.com/arthur-fontaine/agrume/package.json".into());
             }),
             EditorView,
         )),
