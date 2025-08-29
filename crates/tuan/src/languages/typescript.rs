@@ -1,9 +1,10 @@
 use crate::file::File;
-use crate::graph_view::{Graph, GraphFeeder};
+use crate::graph_view::{GraphFeeder, GraphState};
 use oxc_allocator::Allocator;
 use oxc_ast::ast::*;
 use oxc_ast_visit::Visit;
 use oxc_parser::{Parser, ParserReturn};
+use oxc_resolver::{ResolveOptions, Resolver, TsconfigOptions, TsconfigReferences};
 use oxc_span::SourceType;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,16 +12,47 @@ use walkdir::WalkDir;
 
 pub struct TypescriptProject {
     project_path: PathBuf,
+    resolver: Resolver,
 }
 
 impl TypescriptProject {
     pub fn new(project_path: PathBuf) -> Self {
-        Self { project_path }
+        let resolver = Self::build_resolver(&project_path);
+        Self {
+            project_path,
+            resolver,
+        }
+    }
+
+    fn build_resolver(project_root: &Path) -> Resolver {
+        let config_file = project_root.join("tsconfig.json");
+
+        let options = ResolveOptions {
+            extensions: vec![
+                ".ts".into(),
+                ".tsx".into(),
+                ".mts".into(),
+                ".cts".into(),
+                ".js".into(),
+                ".jsx".into(),
+                ".mjs".into(),
+                ".cjs".into(),
+                ".json".into(),
+            ],
+            condition_names: vec!["node".into(), "import".into()],
+            tsconfig: Some(TsconfigOptions {
+                config_file,
+                references: TsconfigReferences::Auto,
+            }),
+            ..ResolveOptions::default()
+        };
+
+        Resolver::new(options)
     }
 }
 
 impl GraphFeeder for TypescriptProject {
-    fn feed_graph(&self, graph: &mut Graph) {
+    fn feed_graph(&self, graph: &mut GraphState) {
         let root = &self.project_path;
         let ts_files = Self::find_typescript_files(root);
 
@@ -29,19 +61,17 @@ impl GraphFeeder for TypescriptProject {
         }
 
         for file in &ts_files {
-            match Self::extract_typescript_imports(file) {
+            match self.extract_typescript_imports(file) {
                 Ok(imports) => {
                     for imported_file in imports {
                         graph.add_relation(file.clone(), imported_file);
                     }
                 }
-                Err(e) => {
-                    tracing::error!(
-                        "Error extracting imports from {}: {}",
-                        file.path.display(),
-                        e
-                    );
-                }
+                Err(e) => tracing::error!(
+                    "Error extracting imports from {}: {}",
+                    file.path.display(),
+                    e
+                ),
             }
         }
     }
@@ -79,10 +109,12 @@ impl TypescriptProject {
             .collect()
     }
 
-    fn extract_typescript_imports(file: &File) -> Result<Vec<File>, Box<dyn std::error::Error>> {
-        let source_code = fs::read_to_string(&file.path)?;
-        let allocator = Allocator::default();
-
+    fn extract_typescript_imports(
+        &self,
+        file: &File,
+    ) -> Result<Vec<File>, Box<dyn std::error::Error>> {
+        let source_code = std::fs::read_to_string(&file.path)?;
+        let allocator = oxc_allocator::Allocator::default();
         let source_type = match file.path.extension().and_then(|s| s.to_str()) {
             Some("tsx") => SourceType::tsx(),
             Some("ts") => SourceType::ts(),
@@ -90,98 +122,53 @@ impl TypescriptProject {
             Some("js") => SourceType::unambiguous(),
             Some("mjs") => SourceType::mjs(),
             Some("cjs") => SourceType::cjs(),
-            _ => SourceType::default(),
+            _ => SourceType::unambiguous(),
         };
 
         let ParserReturn {
             program, errors, ..
         } = Parser::new(&allocator, &source_code, source_type).parse();
-
-        if !errors.is_empty() {
-            for error in &errors {
-                eprintln!("Parse error in {}: {}", file.path.display(), error);
-            }
+        for e in &errors {
+            eprintln!("Parse error in {}: {e}", file.path.display());
         }
 
-        let mut visitor = ImportVisitor::new(&file.path);
+        let mut visitor = ImportVisitor::new(&file.path, &self.resolver, &self.project_path);
         visitor.visit_program(&program);
-
         Ok(visitor.imports)
     }
 }
 
-struct ImportVisitor {
+struct ImportVisitor<'a> {
     imports: Vec<File>,
     current_file_dir: PathBuf,
+    resolver: &'a Resolver,
+    project_root: &'a Path,
 }
 
-impl ImportVisitor {
-    fn new(current_file_path: &PathBuf) -> Self {
+impl<'a> ImportVisitor<'a> {
+    fn new(current_file_path: &PathBuf, resolver: &'a Resolver, project_root: &'a Path) -> Self {
         Self {
             imports: Vec::new(),
             current_file_dir: current_file_path
                 .parent()
                 .unwrap_or(Path::new(""))
                 .to_path_buf(),
+            resolver,
+            project_root,
         }
     }
 
-    fn add_import(&mut self, import_path: &str) {
-        if let Some(resolved_path) = self.resolve_import_path(import_path) {
-            let canonical_path = resolved_path.canonicalize().unwrap_or(resolved_path);
-            self.imports.push(File::new(canonical_path));
+    fn add_import(&mut self, specifier: &str) {
+        let context = self.current_file_dir.clone();
+
+        if let Ok(resolution) = self.resolver.resolve(context, specifier) {
+            let path = resolution.full_path().to_path_buf();
+            self.imports.push(File::new(path));
         }
-    }
-
-    fn resolve_import_path(&self, import_path: &str) -> Option<PathBuf> {
-        if import_path.starts_with('.') {
-            let resolved = self.current_file_dir.join(import_path);
-
-            let canonical_base = match resolved.canonicalize() {
-                Ok(path) => path,
-                Err(_) => self.manual_resolve_path(&resolved),
-            };
-
-            for ext in [".ts", ".tsx", ".js", ".jsx"] {
-                let with_ext = canonical_base.with_extension(&ext[1..]);
-                if with_ext.exists() {
-                    return Some(with_ext);
-                }
-            }
-
-            for ext in [".ts", ".tsx", ".js", ".jsx"] {
-                let index_file = canonical_base.join(format!("index{}", ext));
-                if index_file.exists() {
-                    return Some(index_file);
-                }
-            }
-        }
-        None
-    }
-
-    fn manual_resolve_path(&self, path: &Path) -> PathBuf {
-        use std::path::Component;
-        let mut components = Vec::new();
-
-        for component in path.components() {
-            match component {
-                Component::ParentDir => {
-                    components.pop();
-                }
-                Component::CurDir => {}
-                other => components.push(other),
-            }
-        }
-
-        let mut result = PathBuf::new();
-        for component in components {
-            result.push(component);
-        }
-        result
     }
 }
 
-impl<'a> Visit<'a> for ImportVisitor {
+impl<'a> Visit<'a> for ImportVisitor<'a> {
     fn visit_import_declaration(&mut self, decl: &ImportDeclaration<'a>) {
         self.add_import(decl.source.value.as_str());
     }
