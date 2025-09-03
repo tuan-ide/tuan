@@ -25,6 +25,8 @@ impl GraphPortal {
 }
 
 impl Widget for GraphPortal {
+    type Action = GraphAction;
+
     fn layout(
         &mut self,
         _ctx: &mut masonry::core::LayoutCtx<'_>,
@@ -137,7 +139,18 @@ impl Widget for GraphPortal {
         event: &masonry::core::PointerEvent,
     ) {
         match event {
-            _ => {}
+            masonry::core::PointerEvent::Move(_) => {}
+            masonry::core::PointerEvent::Gesture(gesture) => {
+                match gesture.gesture {
+                    masonry::core::pointer::PointerGesture::Pinch(pinch_delta) => {
+                        println!("Pinch gesture: scale_delta = {}", pinch_delta);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {
+                // println!("GraphPortal received pointer event: {:?}", event);
+            }
         }
     }
 
@@ -180,7 +193,6 @@ impl View<GraphState, (), ViewCtx> for GraphView {
         view_state: &mut Self::ViewState,
         ctx: &mut ViewCtx,
         element: xilem::core::Mut<'_, Self::Element>,
-        app_state: &mut GraphState,
     ) {
         ctx.teardown_leaf(element);
     }
@@ -188,11 +200,11 @@ impl View<GraphState, (), ViewCtx> for GraphView {
     fn message(
         &self,
         view_state: &mut Self::ViewState,
-        id_path: &[xilem::core::ViewId],
-        message: xilem::core::DynMessage,
+        message: &mut xilem::core::MessageContext,
+        element: xilem::core::Mut<'_, Self::Element>,
         app_state: &mut GraphState,
     ) -> xilem::core::MessageResult<()> {
-        if let Ok(graph_action) = message.downcast::<GraphAction>() {
+        if let Some(graph_action) = message.take_message::<GraphAction>() {
             match graph_action.as_ref() {
                 _ => MessageResult::Nop,
             }

@@ -4,6 +4,7 @@ use crate::theme::theme::Theme as _;
 use crate::{document::Document, editor_view::EditorState};
 use masonry::core::Modifiers;
 use masonry::core::keyboard::Key;
+use masonry::core::pointer::{PointerButtonEvent, PointerScrollEvent};
 use masonry::{
     accesskit::Role,
     core::{ScrollDelta, Widget},
@@ -20,16 +21,22 @@ use xilem::{
 };
 
 pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
-    state.open_file("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
+    state.open_file(
+        "/Users/arthur-fontaine/Developer/code/github.com/arthur-fontaine/agrume/package.json"
+            .into(),
+    );
 
     fork(
         // TODO: remove the flex box and the Open File button, those are just for testing
-        flex((
-            button("Open File", |state: &mut EditorState| {
-                state.focus_document("/Users/arthurfontaine/Developer/code/local/la-galerie-de-max/la-galerie-de-max copie/package.json".into());
-            }),
-            EditorView,
-        )),
+        flex(
+            xilem::view::Axis::Vertical,
+            (
+                button("Open File", |state: &mut EditorState| {
+                    state.focus_document("/Users/arthur-fontaine/Developer/code/github.com/arthur-fontaine/agrume/package.json".into());
+                }),
+                EditorView,
+            ),
+        ),
         task(
             async move |proxy| {
                 let mut interval = tokio::time::interval(Duration::from_millis(500));
@@ -62,6 +69,8 @@ impl EditorPortal {
 }
 
 impl Widget for EditorPortal {
+    type Action = EditorAction;
+
     fn layout(
         &mut self,
         _ctx: &mut masonry::core::LayoutCtx<'_>,
@@ -168,25 +177,25 @@ impl Widget for EditorPortal {
         event: &masonry::core::PointerEvent,
     ) {
         match event {
-            masonry::core::PointerEvent::Scroll {
+            masonry::core::PointerEvent::Scroll(PointerScrollEvent {
                 pointer,
                 delta,
                 state,
-            } => {
+            }) => {
                 if let ScrollDelta::PixelDelta(delta) = delta {
                     if let Some(focused_document) = self.state.get_focused_document() {
-                        ctx.submit_action(EditorAction::Scroll {
+                        ctx.submit_action::<Self::Action>(EditorAction::Scroll {
                             delta: (delta.x, delta.y),
                             document: focused_document,
                         });
                     }
                 }
             }
-            masonry::core::PointerEvent::Down {
+            masonry::core::PointerEvent::Down(PointerButtonEvent {
                 pointer,
                 button,
                 state,
-            } => {
+            }) => {
                 ctx.request_focus();
 
                 let focused_document = self.state.get_focused_document().unwrap();
@@ -214,10 +223,10 @@ impl Widget for EditorPortal {
                     })
                     .unwrap_or((0, 0));
 
-                ctx.submit_action(EditorAction::ClearCursors {
+                ctx.submit_action::<Self::Action>(EditorAction::ClearCursors {
                     document: focused_document.clone(),
                 });
-                ctx.submit_action(EditorAction::AddCursor {
+                ctx.submit_action::<Self::Action>(EditorAction::AddCursor {
                     document: focused_document,
                     position: (line_number, char_index),
                 });
@@ -234,7 +243,7 @@ impl Widget for EditorPortal {
     ) {
         if let masonry::core::TextEvent::Keyboard(key_event) = event {
             if key_event.state.is_down() {
-                ctx.submit_action(EditorAction::KeyPress(
+                ctx.submit_action::<Self::Action>(EditorAction::KeyPress(
                     key_event.key.clone(),
                     key_event.modifiers,
                 ));
@@ -289,7 +298,6 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         view_state: &mut Self::ViewState,
         ctx: &mut ViewCtx,
         element: xilem::core::Mut<'_, Self::Element>,
-        app_state: &mut EditorState,
     ) {
         ctx.teardown_leaf(element);
     }
@@ -297,11 +305,11 @@ impl View<EditorState, (), ViewCtx> for EditorView {
     fn message(
         &self,
         view_state: &mut Self::ViewState,
-        id_path: &[xilem::core::ViewId],
-        message: xilem::core::DynMessage,
+        message: &mut xilem::core::MessageContext,
+        element: xilem::core::Mut<'_, Self::Element>,
         app_state: &mut EditorState,
     ) -> xilem::core::MessageResult<()> {
-        if let Ok(editor_action) = message.downcast::<EditorAction>() {
+        if let Some(editor_action) = message.take_message::<EditorAction>() {
             match editor_action.as_ref() {
                 EditorAction::KeyPress(key, modifiers) => {
                     app_state.press_key(key.clone(), modifiers.clone());
@@ -312,7 +320,7 @@ impl View<EditorState, (), ViewCtx> for EditorView {
                     MessageResult::RequestRebuild
                 }
                 EditorAction::AddCursor { document, position } => {
-                    app_state.add_cursor(document.path.clone(), position);
+                    app_state.add_cursor(document.path.clone(), &position);
                     MessageResult::RequestRebuild
                 }
                 EditorAction::ClearCursors { document } => {

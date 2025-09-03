@@ -10,8 +10,8 @@ default-members = ["crates/tuan"]
 
 [workspace.dependencies]
 alacritty_terminal = { version = "0.25.0" }
-xilem = { git = "https://github.com/linebender/xilem", rev = "5e49206" }
-masonry = { git = "https://github.com/linebender/xilem", rev = "5e49206" }
+xilem = { git = "https://github.com/tuan-ide/xilem", rev = "035bf5e" }
+masonry = { git = "https://github.com/tuan-ide/xilem", rev = "035bf5e" }
 winit ={ version = "0.30.0" }
 crossbeam-channel = { version = "0.5.15" }
 glib = { version = "0.21.0" }
