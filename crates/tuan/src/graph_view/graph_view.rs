@@ -61,7 +61,9 @@ impl Widget for GraphPortal {
 
         self.state
             .init_camera((size.width as f64, size.height as f64));
-        let camera = self.state.camera.clone().unwrap();
+        
+        let camera = self.state.camera.borrow();
+        let camera = camera.as_ref().unwrap();
 
         let graph = self.state.graph.get_graph();
 
@@ -143,7 +145,7 @@ impl Widget for GraphPortal {
             masonry::core::PointerEvent::Gesture(gesture) => {
                 match gesture.gesture {
                     masonry::core::pointer::PointerGesture::Pinch(pinch_delta) => {
-                        println!("Pinch gesture: scale_delta = {}", pinch_delta);
+                        ctx.submit_action::<GraphAction>(GraphAction::Zoom(pinch_delta as f64));
                     }
                     _ => {}
                 }
@@ -206,7 +208,15 @@ impl View<GraphState, (), ViewCtx> for GraphView {
     ) -> xilem::core::MessageResult<()> {
         if let Some(graph_action) = message.take_message::<GraphAction>() {
             match graph_action.as_ref() {
-                _ => MessageResult::Nop,
+                GraphAction::Zoom(factor) => {
+                    let mut camera = app_state.camera.borrow_mut();
+                    if let Some(camera) = &mut *camera {
+                        camera.zoom(*factor);
+                        MessageResult::RequestRebuild
+                    } else {
+                        MessageResult::Nop
+                    }
+                }
             }
         } else {
             MessageResult::Nop
@@ -215,4 +225,6 @@ impl View<GraphState, (), ViewCtx> for GraphView {
 }
 
 #[derive(Debug)]
-enum GraphAction {}
+enum GraphAction {
+    Zoom(f64),
+}

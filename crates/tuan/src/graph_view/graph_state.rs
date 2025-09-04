@@ -9,14 +9,14 @@ use fdg_sim::{
     },
 };
 use quad_rand::RandomRange;
-use std::{collections::HashMap, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 use xilem::Vec2;
 
 #[derive(Clone)]
 pub struct GraphState {
     pub(super) graph: Simulation<File, ()>,
     pub(super) editor_config: Arc<EditorConfig>,
-    pub(super) camera: Option<Camera>,
+    pub(super) camera: Rc<RefCell<Option<Camera>>>,
     path_to_node_index: HashMap<File, NodeIndex>,
 }
 
@@ -32,21 +32,21 @@ impl GraphState {
         Self {
             graph,
             editor_config,
-            camera: None,
+            camera: Rc::new(RefCell::new(None)),
             path_to_node_index: HashMap::new(),
         }
     }
 
     pub(super) fn init_camera(&mut self, size: (f64, f64)) {
-        if self.camera.is_some() {
-            return;
+        let mut camera = self.camera.borrow_mut();
+        if camera.is_none() {
+            let cam = Camera::new(
+                Vec2::new(size.0 / 2.0, size.1 / 2.0),
+                1.0,
+                size,
+            );
+            *camera = Some(cam);
         }
-        let camera = Camera {
-            center: Vec2::new(size.0 / 2.0, size.1 / 2.0),
-            zoom: 1.0,
-            viewport: size,
-        };
-        self.camera = Some(camera);
     }
 
     pub fn add_file(&mut self, file: File) {
