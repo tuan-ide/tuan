@@ -3,9 +3,9 @@ use xilem::Vec2;
 
 #[derive(Clone)]
 pub(super) struct Camera {
-    pub center: Vec2,
+    center: Vec2,
     zoom: f64,
-    pub viewport: (f64, f64),
+    viewport: (f64, f64),
 }
 
 impl Camera {
@@ -24,8 +24,23 @@ impl Camera {
         v * self.zoom
     }
 
-    pub fn zoom(&mut self, factor: f64) {
-        self.zoom *= 1.0 + factor;
-        self.zoom = self.zoom.clamp(0.1, 3.5);
+    pub fn zoom(&mut self, factor: f64, origin: Option<Vec2>) {
+        let old_zoom = self.zoom;
+        let new_zoom = (old_zoom * (1.0 + factor)).clamp(0.1, 3.5);
+        if (new_zoom - old_zoom).abs() < f64::EPSILON {
+            return;
+        }
+
+        let screen_center = Vec2::new(self.viewport.0 * 0.5, self.viewport.1 * 0.5);
+        let s0 = origin.unwrap_or(screen_center);
+        let delta_screen = s0 - screen_center;
+
+        self.center = self.center + delta_screen * (1.0 / old_zoom - 1.0 / new_zoom);
+        self.zoom = new_zoom;
+    }
+
+    pub fn translate(&mut self, xy: Vec2) {
+        self.center.x -= xy.x / self.zoom;
+        self.center.y -= xy.y / self.zoom;
     }
 }

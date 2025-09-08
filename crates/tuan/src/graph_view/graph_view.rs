@@ -2,9 +2,11 @@ use crate::graph_view::graph_descriptor::create_graph_descriptor;
 use crate::graph_view::{GraphState, camera};
 use crate::theme;
 use crate::theme::theme::Theme as _;
+use masonry::core::ScrollDelta;
 use masonry::kurbo::{Circle, Line, Point, Rect};
 use masonry::{accesskit::Role, core::Widget};
-use xilem::{Affine, Color};
+use winit::dpi::LogicalPosition;
+use xilem::{Affine, Color, Vec2};
 use xilem::{
     Pod, ViewCtx, WidgetView,
     core::{MessageResult, View, ViewMarker},
@@ -61,7 +63,7 @@ impl Widget for GraphPortal {
 
         self.state
             .init_camera((size.width as f64, size.height as f64));
-        
+
         let camera = self.state.camera.borrow();
         let camera = camera.as_ref().unwrap();
 
@@ -141,15 +143,32 @@ impl Widget for GraphPortal {
         event: &masonry::core::PointerEvent,
     ) {
         match event {
-            masonry::core::PointerEvent::Move(_) => {}
-            masonry::core::PointerEvent::Gesture(gesture) => {
-                match gesture.gesture {
-                    masonry::core::pointer::PointerGesture::Pinch(pinch_delta) => {
-                        ctx.submit_action::<GraphAction>(GraphAction::Zoom(pinch_delta as f64));
-                    }
-                    _ => {}
+            masonry::core::PointerEvent::Scroll(movement) => match movement.delta {
+                ScrollDelta::PixelDelta(physical_position) => {
+                    let position: LogicalPosition<f64> =
+                        physical_position.to_logical(ctx.get_scale_factor());
+                    ctx.submit_action::<GraphAction>(GraphAction::Translate(Vec2::new(
+                        position.x,
+                        position.y,
+                    )));
                 }
-            }
+                _ => {}
+            },
+            masonry::core::PointerEvent::Gesture(gesture) => match gesture.gesture {
+                masonry::core::pointer::PointerGesture::Pinch(pinch_delta) => {
+                    let logical_position: LogicalPosition<f64> =
+                        gesture.state.position.to_logical(ctx.get_scale_factor());
+                    println!(
+                        "origin: {:?}, delta: {:?}",
+                        logical_position, pinch_delta
+                    );
+                    ctx.submit_action::<GraphAction>(GraphAction::Zoom(
+                        pinch_delta as f64,
+                        Vec2::new(logical_position.x, logical_position.y),
+                    ));
+                }
+                _ => {}
+            },
             _ => {
                 // println!("GraphPortal received pointer event: {:?}", event);
             }
@@ -208,10 +227,19 @@ impl View<GraphState, (), ViewCtx> for GraphView {
     ) -> xilem::core::MessageResult<()> {
         if let Some(graph_action) = message.take_message::<GraphAction>() {
             match graph_action.as_ref() {
-                GraphAction::Zoom(factor) => {
+                GraphAction::Zoom(factor, origin) => {
                     let mut camera = app_state.camera.borrow_mut();
                     if let Some(camera) = &mut *camera {
-                        camera.zoom(*factor);
+                        camera.zoom(*factor, Some(*origin));
+                        MessageResult::RequestRebuild
+                    } else {
+                        MessageResult::Nop
+                    }
+                }
+                GraphAction::Translate(xy) => {
+                    let mut camera = app_state.camera.borrow_mut();
+                    if let Some(camera) = &mut *camera {
+                        camera.translate(*xy);
                         MessageResult::RequestRebuild
                     } else {
                         MessageResult::Nop
@@ -226,5 +254,6 @@ impl View<GraphState, (), ViewCtx> for GraphView {
 
 #[derive(Debug)]
 enum GraphAction {
-    Zoom(f64),
+    Zoom(f64, Vec2),
+    Translate(Vec2),
 }
