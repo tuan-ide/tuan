@@ -1,5 +1,7 @@
+use crate::app::AppState;
+use crate::editor_view::EditorState;
 use crate::file::File;
-use crate::graph_view::{GraphState, camera};
+use crate::graph_view::GraphState;
 use crate::theme;
 use crate::theme::theme::Theme as _;
 use masonry::core::ScrollDelta;
@@ -12,7 +14,7 @@ use xilem::{
     core::{MessageResult, View, ViewMarker},
 };
 
-pub fn graph_view(state: &mut GraphState) -> impl WidgetView<GraphState> + use<> {
+pub fn graph_view(state: &mut AppState) -> impl WidgetView<AppState> + use<> {
     GraphView
 }
 
@@ -193,17 +195,17 @@ impl Widget for GraphPortal {
 
 struct GraphView;
 impl ViewMarker for GraphView {}
-impl View<GraphState, (), ViewCtx> for GraphView {
+impl View<AppState, (), ViewCtx> for GraphView {
     type Element = Pod<GraphPortal>;
     type ViewState = ();
 
     fn build(
         &self,
         ctx: &mut ViewCtx,
-        app_state: &mut GraphState,
+        app_state: &mut AppState,
     ) -> (Self::Element, Self::ViewState) {
         (
-            ctx.with_action_widget(|_| (Pod::new(GraphPortal::new(app_state.clone())))),
+            ctx.with_action_widget(|_| Pod::new(GraphPortal::new(app_state.graph_state.clone()))),
             (),
         )
     }
@@ -214,9 +216,9 @@ impl View<GraphState, (), ViewCtx> for GraphView {
         view_state: &mut Self::ViewState,
         ctx: &mut ViewCtx,
         mut element: xilem::core::Mut<Self::Element>,
-        app_state: &mut GraphState,
+        app_state: &mut AppState,
     ) {
-        *element.widget = GraphPortal::new(app_state.clone());
+        *element.widget = GraphPortal::new(app_state.graph_state.clone());
         element.ctx.request_render();
     }
 
@@ -234,12 +236,12 @@ impl View<GraphState, (), ViewCtx> for GraphView {
         view_state: &mut Self::ViewState,
         message: &mut xilem::core::MessageContext,
         element: xilem::core::Mut<'_, Self::Element>,
-        app_state: &mut GraphState,
+        app_state: &mut AppState,
     ) -> xilem::core::MessageResult<()> {
         if let Some(graph_action) = message.take_message::<GraphAction>() {
             match graph_action.as_ref() {
                 GraphAction::Zoom(factor, origin) => {
-                    let mut camera = app_state.camera.borrow_mut();
+                    let mut camera = app_state.graph_state.camera.borrow_mut();
                     if let Some(camera) = &mut *camera {
                         camera.zoom(*factor, Some(*origin));
                         MessageResult::RequestRebuild
@@ -248,7 +250,7 @@ impl View<GraphState, (), ViewCtx> for GraphView {
                     }
                 }
                 GraphAction::Translate(xy) => {
-                    let mut camera = app_state.camera.borrow_mut();
+                    let mut camera = app_state.graph_state.camera.borrow_mut();
                     if let Some(camera) = &mut *camera {
                         camera.translate(*xy);
                         MessageResult::RequestRebuild
@@ -257,8 +259,9 @@ impl View<GraphState, (), ViewCtx> for GraphView {
                     }
                 }
                 GraphAction::OpenFile(file) => {
-                    println!("GraphView: Open file {:?}", file.path);
-                    MessageResult::Nop
+                    app_state.editor_state.open_file(file.path.clone());
+                    app_state.editor_state.focus_document(file.path.clone());
+                    MessageResult::RequestRebuild
                 }
             }
         } else {

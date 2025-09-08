@@ -1,4 +1,5 @@
 use super::paint::line::Line;
+use crate::app::AppState;
 use crate::theme;
 use crate::theme::theme::Theme as _;
 use crate::{document::Document, editor_view::EditorState};
@@ -20,23 +21,9 @@ use xilem::{
     view::{button, flex, task},
 };
 
-pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + use<> {
-    state.open_file(
-        "/Users/arthur-fontaine/Developer/code/github.com/arthur-fontaine/agrume/package.json"
-            .into(),
-    );
-
+pub fn editor_view(state: &mut AppState) -> impl WidgetView<AppState> + use<> {
     fork(
-        // TODO: remove the flex box and the Open File button, those are just for testing
-        flex(
-            xilem::view::Axis::Vertical,
-            (
-                button("Open File", |state: &mut EditorState| {
-                    state.focus_document("/Users/arthur-fontaine/Developer/code/github.com/arthur-fontaine/agrume/package.json".into());
-                }),
-                EditorView,
-            ),
-        ),
+        EditorView,
         task(
             async move |proxy| {
                 let mut interval = tokio::time::interval(Duration::from_millis(500));
@@ -47,8 +34,8 @@ pub fn editor_view(state: &mut EditorState) -> impl WidgetView<EditorState> + us
                     };
                 }
             },
-            |data: &mut EditorState, ()| {
-                data.tick_cursors();
+            |data: &mut AppState, ()| {
+                data.editor_state.tick_cursors();
             },
         ),
     )
@@ -266,17 +253,19 @@ impl Widget for EditorPortal {
 
 struct EditorView;
 impl ViewMarker for EditorView {}
-impl View<EditorState, (), ViewCtx> for EditorView {
+impl View<AppState, (), ViewCtx> for EditorView {
     type Element = Pod<EditorPortal>;
     type ViewState = ();
 
     fn build(
         &self,
         ctx: &mut ViewCtx,
-        app_state: &mut EditorState,
+        app_state: &mut AppState,
     ) -> (Self::Element, Self::ViewState) {
         (
-            ctx.with_action_widget(|_| (Pod::new(EditorPortal::new(app_state.clone())))),
+            ctx.with_action_widget(|_| {
+                Pod::new(EditorPortal::new(app_state.editor_state.clone()))
+            }),
             (),
         )
     }
@@ -287,9 +276,9 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         view_state: &mut Self::ViewState,
         ctx: &mut ViewCtx,
         mut element: xilem::core::Mut<Self::Element>,
-        app_state: &mut EditorState,
+        app_state: &mut AppState,
     ) {
-        *element.widget = EditorPortal::new(app_state.clone());
+        *element.widget = EditorPortal::new(app_state.editor_state.clone());
         element.ctx.request_render();
     }
 
@@ -307,24 +296,24 @@ impl View<EditorState, (), ViewCtx> for EditorView {
         view_state: &mut Self::ViewState,
         message: &mut xilem::core::MessageContext,
         element: xilem::core::Mut<'_, Self::Element>,
-        app_state: &mut EditorState,
+        app_state: &mut AppState,
     ) -> xilem::core::MessageResult<()> {
         if let Some(editor_action) = message.take_message::<EditorAction>() {
             match editor_action.as_ref() {
                 EditorAction::KeyPress(key, modifiers) => {
-                    app_state.press_key(key.clone(), modifiers.clone());
+                    app_state.editor_state.press_key(key.clone(), modifiers.clone());
                     MessageResult::RequestRebuild
                 }
                 EditorAction::Scroll { delta, document } => {
-                    app_state.scroll_document(&document.path, (delta.0, delta.1));
+                    app_state.editor_state.scroll_document(&document.path, (delta.0, delta.1));
                     MessageResult::RequestRebuild
                 }
                 EditorAction::AddCursor { document, position } => {
-                    app_state.add_cursor(document.path.clone(), &position);
+                    app_state.editor_state.add_cursor(document.path.clone(), &position);
                     MessageResult::RequestRebuild
                 }
                 EditorAction::ClearCursors { document } => {
-                    app_state.clear_cursors(document.path.clone());
+                    app_state.editor_state.clear_cursors(document.path.clone());
                     MessageResult::RequestRebuild
                 }
             }

@@ -1,12 +1,8 @@
 use super::camera::Camera;
 use crate::{editor_view::EditorConfig, file::File, graph_view::graph_descriptor::GraphDescriptor};
 use fdg_sim::{
-    ForceGraph, ForceGraphHelper, Node, Simulation, SimulationParameters, force,
-    glam::Vec3,
-    petgraph::{
-        graph::NodeIndex,
-        visit::{EdgeRef as _, IntoEdgeReferences as _},
-    },
+    ForceGraph, ForceGraphHelper, Simulation, SimulationParameters, force, glam::Vec3,
+    petgraph::graph::NodeIndex,
 };
 use quad_rand::RandomRange;
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
