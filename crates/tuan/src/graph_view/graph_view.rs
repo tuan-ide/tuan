@@ -1,4 +1,3 @@
-use crate::graph_view::graph_descriptor::create_graph_descriptor;
 use crate::graph_view::{GraphState, camera};
 use crate::theme;
 use crate::theme::theme::Theme as _;
@@ -63,13 +62,9 @@ impl Widget for GraphPortal {
 
         self.state
             .init_camera((size.width as f64, size.height as f64));
+        self.state.update_graph_descriptor();
 
-        let camera = self.state.camera.borrow();
-        let camera = camera.as_ref().unwrap();
-
-        let graph = self.state.graph.get_graph();
-
-        let graph_descriptor = create_graph_descriptor(graph, &camera);
+        let graph_descriptor = self.state.graph_descriptor.clone().unwrap();
 
         let edge_color = match &self.state.editor_config.theme {
             theme::Theme::Vscode(vscode_theme) => vscode_theme
@@ -143,13 +138,19 @@ impl Widget for GraphPortal {
         event: &masonry::core::PointerEvent,
     ) {
         match event {
-            masonry::core::PointerEvent::Scroll(movement) => match movement.delta {
+            masonry::core::PointerEvent::Move(movement) => {
+                let position: LogicalPosition<f64> =
+                    movement.current.position.to_logical(ctx.get_scale_factor());
+                let graph_descriptor = self.state.graph_descriptor.clone().unwrap();
+                let node =
+                    graph_descriptor.find_node_at_position(Vec2::new(position.x, position.y));
+            }
+            masonry::core::PointerEvent::Scroll(scroll) => match scroll.delta {
                 ScrollDelta::PixelDelta(physical_position) => {
                     let position: LogicalPosition<f64> =
                         physical_position.to_logical(ctx.get_scale_factor());
                     ctx.submit_action::<GraphAction>(GraphAction::Translate(Vec2::new(
-                        position.x,
-                        position.y,
+                        position.x, position.y,
                     )));
                 }
                 _ => {}
@@ -158,10 +159,6 @@ impl Widget for GraphPortal {
                 masonry::core::pointer::PointerGesture::Pinch(pinch_delta) => {
                     let logical_position: LogicalPosition<f64> =
                         gesture.state.position.to_logical(ctx.get_scale_factor());
-                    println!(
-                        "origin: {:?}, delta: {:?}",
-                        logical_position, pinch_delta
-                    );
                     ctx.submit_action::<GraphAction>(GraphAction::Zoom(
                         pinch_delta as f64,
                         Vec2::new(logical_position.x, logical_position.y),

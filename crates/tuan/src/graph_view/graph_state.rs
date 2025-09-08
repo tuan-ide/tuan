@@ -1,5 +1,5 @@
 use super::camera::Camera;
-use crate::{editor_view::EditorConfig, file::File};
+use crate::{editor_view::EditorConfig, file::File, graph_view::graph_descriptor::GraphDescriptor};
 use fdg_sim::{
     ForceGraph, ForceGraphHelper, Node, Simulation, SimulationParameters, force,
     glam::Vec3,
@@ -18,6 +18,7 @@ pub struct GraphState {
     pub(super) editor_config: Arc<EditorConfig>,
     pub(super) camera: Rc<RefCell<Option<Camera>>>,
     path_to_node_index: HashMap<File, NodeIndex>,
+    pub(super) graph_descriptor: Option<super::graph_descriptor::GraphDescriptor>,
 }
 
 impl GraphState {
@@ -34,17 +35,14 @@ impl GraphState {
             editor_config,
             camera: Rc::new(RefCell::new(None)),
             path_to_node_index: HashMap::new(),
+            graph_descriptor: None,
         }
     }
 
     pub(super) fn init_camera(&mut self, size: (f64, f64)) {
         let mut camera = self.camera.borrow_mut();
         if camera.is_none() {
-            let cam = Camera::new(
-                Vec2::new(size.0 / 2.0, size.1 / 2.0),
-                1.0,
-                size,
-            );
+            let cam = Camera::new(Vec2::new(size.0 / 2.0, size.1 / 2.0), 1.0, size);
             *camera = Some(cam);
         }
     }
@@ -99,5 +97,15 @@ impl GraphState {
                 .zip(g2.node_weights())
                 .for_each(|(p, n)| *p = n.location);
         }
+    }
+
+    pub fn update_graph_descriptor(&mut self) {
+        let camera = self.camera.borrow();
+        let camera = camera.as_ref().unwrap();
+
+        let graph = self.graph.get_graph();
+
+        let graph_descriptor = GraphDescriptor::new(graph, camera);
+        self.graph_descriptor = Some(graph_descriptor);
     }
 }
