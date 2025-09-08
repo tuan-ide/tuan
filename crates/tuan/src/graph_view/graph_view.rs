@@ -141,6 +141,22 @@ impl Widget for GraphPortal {
         event: &masonry::core::PointerEvent,
     ) {
         match event {
+            masonry::core::PointerEvent::Move(movement) => {
+                let logical_position: LogicalPosition<f64> =
+                    movement.current.position.to_logical(ctx.get_scale_factor());
+                if let Some(file) = self
+                    .graph_state
+                    .graph_descriptor
+                    .as_ref()
+                    .and_then(|gd| {
+                        gd.find_node_at_position(Vec2::new(logical_position.x, logical_position.y))
+                            .cloned()
+                    })
+                    .map(|n| n.file.clone())
+                {
+                    ctx.submit_action::<GraphAction>(GraphAction::PrepareOpenFile(file));
+                }
+            }
             masonry::core::PointerEvent::Scroll(scroll) => match scroll.delta {
                 ScrollDelta::PixelDelta(physical_position) => {
                     let position: LogicalPosition<f64> =
@@ -258,8 +274,12 @@ impl View<AppState, (), ViewCtx> for GraphView {
                         MessageResult::Nop
                     }
                 }
-                GraphAction::OpenFile(file) => {
+                GraphAction::PrepareOpenFile(file) => {
                     app_state.editor_state.open_file(file.path.clone());
+                    MessageResult::Nop
+                }
+                GraphAction::OpenFile(file) => {
+                    // app_state.editor_state.open_file(file.path.clone());
                     app_state.editor_state.focus_document(file.path.clone());
                     MessageResult::RequestRebuild
                 }
@@ -274,5 +294,6 @@ impl View<AppState, (), ViewCtx> for GraphView {
 enum GraphAction {
     Zoom(f64, Vec2),
     Translate(Vec2),
+    PrepareOpenFile(File),
     OpenFile(File),
 }
