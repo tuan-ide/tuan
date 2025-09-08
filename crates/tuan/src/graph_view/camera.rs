@@ -8,6 +8,9 @@ pub(super) struct Camera {
     viewport: (f64, f64),
 }
 
+const MIN_ZOOM: f64 = 0.1;
+const MAX_ZOOM: f64 = 3.5;
+
 impl Camera {
     pub fn new(center: Vec2, zoom: f64, viewport: (f64, f64)) -> Self {
         Self { center, zoom, viewport }
@@ -26,7 +29,7 @@ impl Camera {
 
     pub fn zoom(&mut self, factor: f64, origin: Option<Vec2>) {
         let old_zoom = self.zoom;
-        let new_zoom = (old_zoom * (1.0 + factor)).clamp(0.1, 3.5);
+        let new_zoom = (old_zoom * (1.0 + factor)).clamp(MIN_ZOOM, MAX_ZOOM);
         if (new_zoom - old_zoom).abs() < f64::EPSILON {
             return;
         }
@@ -42,5 +45,9 @@ impl Camera {
     pub fn translate(&mut self, xy: Vec2) {
         self.center.x -= xy.x / self.zoom;
         self.center.y -= xy.y / self.zoom;
+    }
+
+    pub fn is_zoomed_at_max(&self) -> bool {
+        (self.zoom - MAX_ZOOM).abs() < f64::EPSILON
     }
 }

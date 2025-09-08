@@ -1,3 +1,4 @@
+use crate::file::File;
 use crate::graph_view::{GraphState, camera};
 use crate::theme;
 use crate::theme::theme::Theme as _;
@@ -16,12 +17,12 @@ pub fn graph_view(state: &mut GraphState) -> impl WidgetView<GraphState> + use<>
 }
 
 struct GraphPortal {
-    state: GraphState,
+    graph_state: GraphState,
 }
 
 impl GraphPortal {
     fn new(state: GraphState) -> Self {
-        Self { state }
+        Self { graph_state: state }
     }
 }
 
@@ -46,7 +47,7 @@ impl Widget for GraphPortal {
         let size = ctx.size();
 
         let background_rect = Rect::new(0.0, 0.0, size.width, size.height);
-        let background_color = match &self.state.editor_config.theme {
+        let background_color = match &self.graph_state.editor_config.theme {
             theme::Theme::Vscode(vscode_theme) => vscode_theme
                 .get_style(vec!["editor.background"])
                 .and_then(|s| s.color),
@@ -60,13 +61,13 @@ impl Widget for GraphPortal {
             &background_rect,
         );
 
-        self.state
+        self.graph_state
             .init_camera((size.width as f64, size.height as f64));
-        self.state.update_graph_descriptor();
+        self.graph_state.update_graph_descriptor();
 
-        let graph_descriptor = self.state.graph_descriptor.clone().unwrap();
+        let graph_descriptor = self.graph_state.graph_descriptor.clone().unwrap();
 
-        let edge_color = match &self.state.editor_config.theme {
+        let edge_color = match &self.graph_state.editor_config.theme {
             theme::Theme::Vscode(vscode_theme) => vscode_theme
                 .get_style(vec!["editor.foreground"])
                 .and_then(|s| s.color),
@@ -138,13 +139,6 @@ impl Widget for GraphPortal {
         event: &masonry::core::PointerEvent,
     ) {
         match event {
-            masonry::core::PointerEvent::Move(movement) => {
-                let position: LogicalPosition<f64> =
-                    movement.current.position.to_logical(ctx.get_scale_factor());
-                let graph_descriptor = self.state.graph_descriptor.clone().unwrap();
-                let node =
-                    graph_descriptor.find_node_at_position(Vec2::new(position.x, position.y));
-            }
             masonry::core::PointerEvent::Scroll(scroll) => match scroll.delta {
                 ScrollDelta::PixelDelta(physical_position) => {
                     let position: LogicalPosition<f64> =
@@ -159,10 +153,30 @@ impl Widget for GraphPortal {
                 masonry::core::pointer::PointerGesture::Pinch(pinch_delta) => {
                     let logical_position: LogicalPosition<f64> =
                         gesture.state.position.to_logical(ctx.get_scale_factor());
+
                     ctx.submit_action::<GraphAction>(GraphAction::Zoom(
                         pinch_delta as f64,
                         Vec2::new(logical_position.x, logical_position.y),
                     ));
+
+                    let camera = self.graph_state.camera.borrow();
+                    if camera.as_ref().map_or(false, |c| c.is_zoomed_at_max()) {
+                        if let Some(file) = self
+                            .graph_state
+                            .graph_descriptor
+                            .as_ref()
+                            .and_then(|gd| {
+                                gd.find_node_at_position(Vec2::new(
+                                    logical_position.x,
+                                    logical_position.y,
+                                ))
+                                .cloned()
+                            })
+                            .map(|n| n.file.clone())
+                        {
+                            ctx.submit_action::<GraphAction>(GraphAction::OpenFile(file));
+                        }
+                    }
                 }
                 _ => {}
             },
@@ -242,6 +256,10 @@ impl View<GraphState, (), ViewCtx> for GraphView {
                         MessageResult::Nop
                     }
                 }
+                GraphAction::OpenFile(file) => {
+                    println!("GraphView: Open file {:?}", file.path);
+                    MessageResult::Nop
+                }
             }
         } else {
             MessageResult::Nop
@@ -253,4 +271,5 @@ impl View<GraphState, (), ViewCtx> for GraphView {
 enum GraphAction {
     Zoom(f64, Vec2),
     Translate(Vec2),
+    OpenFile(File),
 }
