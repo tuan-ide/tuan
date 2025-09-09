@@ -218,6 +218,14 @@ impl Widget for EditorPortal {
                     position: (line_number, char_index),
                 });
             }
+            masonry::core::PointerEvent::Gesture(gesture) => match gesture.gesture {
+                masonry::core::pointer::PointerGesture::Pinch(pinch_delta) => {
+                    if pinch_delta < 0.0 {
+                        ctx.submit_action::<Self::Action>(EditorAction::OpenGraphView);
+                    }
+                }
+                _ => {}
+            },
             _ => {}
         }
     }
@@ -263,9 +271,7 @@ impl View<AppState, (), ViewCtx> for EditorView {
         app_state: &mut AppState,
     ) -> (Self::Element, Self::ViewState) {
         (
-            ctx.with_action_widget(|_| {
-                Pod::new(EditorPortal::new(app_state.editor_state.clone()))
-            }),
+            ctx.with_action_widget(|_| Pod::new(EditorPortal::new(app_state.editor_state.clone()))),
             (),
         )
     }
@@ -301,19 +307,29 @@ impl View<AppState, (), ViewCtx> for EditorView {
         if let Some(editor_action) = message.take_message::<EditorAction>() {
             match editor_action.as_ref() {
                 EditorAction::KeyPress(key, modifiers) => {
-                    app_state.editor_state.press_key(key.clone(), modifiers.clone());
+                    app_state
+                        .editor_state
+                        .press_key(key.clone(), modifiers.clone());
                     MessageResult::RequestRebuild
                 }
                 EditorAction::Scroll { delta, document } => {
-                    app_state.editor_state.scroll_document(&document.path, (delta.0, delta.1));
+                    app_state
+                        .editor_state
+                        .scroll_document(&document.path, (delta.0, delta.1));
                     MessageResult::RequestRebuild
                 }
                 EditorAction::AddCursor { document, position } => {
-                    app_state.editor_state.add_cursor(document.path.clone(), &position);
+                    app_state
+                        .editor_state
+                        .add_cursor(document.path.clone(), &position);
                     MessageResult::RequestRebuild
                 }
                 EditorAction::ClearCursors { document } => {
                     app_state.editor_state.clear_cursors(document.path.clone());
+                    MessageResult::RequestRebuild
+                }
+                EditorAction::OpenGraphView => {
+                    app_state.editor_state.focused_document_path = None;
                     MessageResult::RequestRebuild
                 }
             }
@@ -337,4 +353,5 @@ enum EditorAction {
     ClearCursors {
         document: Document,
     },
+    OpenGraphView,
 }

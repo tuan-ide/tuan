@@ -48,7 +48,7 @@ impl Cursor {
             None => {
                 // In case the cursor is at the end of the line, we take the previous character's range
                 // and shift it to the right
-                let x_range = line.get_x_range_for_index(self.column - 1)?;
+                let x_range = line.get_x_range_for_index(self.column.saturating_sub(1))?;
                 let delta = x_range.1 - x_range.0;
                 (x_range.0 + delta, x_range.1 + delta)
             }
