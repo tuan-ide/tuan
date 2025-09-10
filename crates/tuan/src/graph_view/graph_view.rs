@@ -141,6 +141,33 @@ impl Widget for GraphPortal {
         event: &masonry::core::PointerEvent,
     ) {
         match event {
+            masonry::core::PointerEvent::Down(down) => {
+                let logical_position: LogicalPosition<f64> =
+                    down.state.position.to_logical(ctx.get_scale_factor());
+                println!("{:?} count", down.state.count);
+                match down.state.count {
+                    2 => {
+                        if let Some(file) = self
+                            .graph_state
+                            .graph_descriptor
+                            .as_ref()
+                            .and_then(|gd| {
+                                gd.find_node_at_position(Vec2::new(
+                                    logical_position.x,
+                                    logical_position.y,
+                                ))
+                                .cloned()
+                            })
+                            .map(|n| n.file.clone())
+                        {
+                            ctx.submit_action::<GraphAction>(GraphAction::OpenFile(file));
+                        }
+                    }
+                    _ => {
+                        ctx.request_focus();
+                    }
+                }
+            }
             masonry::core::PointerEvent::Move(movement) => {
                 let logical_position: LogicalPosition<f64> =
                     movement.current.position.to_logical(ctx.get_scale_factor());
