@@ -106,7 +106,7 @@ impl Line {
 
         let mut brushes: Vec<Brush> = vec![];
         for style in styles {
-            let range = (style.start - line.start)..(style.end - line.start);
+            let range = (style.start.saturating_sub(line.start))..(style.end.saturating_sub(line.start));
             let style = style.style.clone();
 
             if style.italic {

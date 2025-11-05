@@ -1,0 +1,326 @@
+use crate::app::AppState;
+use crate::editor_view::EditorState;
+use crate::file::File;
+use crate::graph_view::GraphState;
+use crate::theme;
+use crate::theme::theme::Theme as _;
+use masonry::core::ScrollDelta;
+use masonry::kurbo::{Circle, Line, Point, Rect};
+use masonry::{accesskit::Role, core::Widget};
+use winit::dpi::LogicalPosition;
+use xilem::{Affine, Color, Vec2};
+use xilem::{
+    Pod, ViewCtx, WidgetView,
+    core::{MessageResult, View, ViewMarker},
+};
+
+pub fn graph_view(state: &mut AppState) -> impl WidgetView<AppState> + use<> {
+    GraphView
+}
+
+struct GraphPortal {
+    graph_state: GraphState,
+}
+
+impl GraphPortal {
+    fn new(state: GraphState) -> Self {
+        Self { graph_state: state }
+    }
+}
+
+impl Widget for GraphPortal {
+    type Action = GraphAction;
+
+    fn layout(
+        &mut self,
+        _ctx: &mut masonry::core::LayoutCtx<'_>,
+        _props: &mut masonry::core::PropertiesMut<'_>,
+        bc: &masonry::core::BoxConstraints,
+    ) -> masonry::kurbo::Size {
+        bc.max()
+    }
+
+    fn paint(
+        &mut self,
+        ctx: &mut masonry::core::PaintCtx<'_>,
+        props: &masonry::core::PropertiesRef<'_>,
+        scene: &mut masonry::vello::Scene,
+    ) {
+        let size = ctx.size();
+
+        let background_rect = Rect::new(0.0, 0.0, size.width, size.height);
+        let background_color = match &self.graph_state.editor_config.theme {
+            theme::Theme::Vscode(vscode_theme) => vscode_theme
+                .get_style(vec!["editor.background"])
+                .and_then(|s| s.color),
+        }
+        .unwrap_or(Color::BLACK);
+        scene.fill(
+            masonry::peniko::Fill::EvenOdd,
+            Affine::IDENTITY,
+            background_color,
+            None,
+            &background_rect,
+        );
+
+        self.graph_state
+            .init_camera((size.width as f64, size.height as f64));
+        self.graph_state.update_graph_descriptor();
+
+        let graph_descriptor = self.graph_state.graph_descriptor.clone().unwrap();
+
+        let edge_color = match &self.graph_state.editor_config.theme {
+            theme::Theme::Vscode(vscode_theme) => vscode_theme
+                .get_style(vec!["editor.foreground"])
+                .and_then(|s| s.color),
+        }
+        .unwrap_or(Color::BLACK);
+
+        for edge in graph_descriptor.edges {
+            scene.stroke(
+                &masonry::kurbo::Stroke::new(edge.width),
+                Affine::IDENTITY,
+                edge_color,
+                None,
+                &Line::new(
+                    Point {
+                        x: edge.source_position.x as f64,
+                        y: edge.source_position.y as f64,
+                    },
+                    Point {
+                        x: edge.target_position.x as f64,
+                        y: edge.target_position.y as f64,
+                    },
+                ),
+            );
+        }
+
+        for node in graph_descriptor.nodes {
+            scene.fill(
+                masonry::peniko::Fill::EvenOdd,
+                Affine::IDENTITY,
+                edge_color,
+                None,
+                &Circle::new(
+                    Point {
+                        x: node.position.x as f64,
+                        y: node.position.y as f64,
+                    },
+                    node.radius,
+                ),
+            );
+        }
+    }
+
+    fn accessibility_role(&self) -> masonry::accesskit::Role {
+        Role::MultilineTextInput
+    }
+
+    fn accessibility(
+        &mut self,
+        ctx: &mut masonry::core::AccessCtx<'_>,
+        props: &masonry::core::PropertiesRef<'_>,
+        node: &mut masonry::accesskit::Node,
+    ) {
+        // TODO
+    }
+
+    fn register_children(&mut self, ctx: &mut masonry::core::RegisterCtx<'_>) {
+        // TODO
+    }
+
+    fn children_ids(&self) -> masonry::core::ChildrenIds {
+        // TODO
+        masonry::core::ChildrenIds::new()
+    }
+
+    fn on_pointer_event(
+        &mut self,
+        ctx: &mut masonry::core::EventCtx<'_>,
+        props: &mut masonry::core::PropertiesMut<'_>,
+        event: &masonry::core::PointerEvent,
+    ) {
+        match event {
+            masonry::core::PointerEvent::Down(down) => {
+                let logical_position: LogicalPosition<f64> =
+                    down.state.position.to_logical(ctx.get_scale_factor());
+                println!("{:?} count", down.state.count);
+                match down.state.count {
+                    2 => {
+                        if let Some(file) = self
+                            .graph_state
+                            .graph_descriptor
+                            .as_ref()
+                            .and_then(|gd| {
+                                gd.find_node_at_position(Vec2::new(
+                                    logical_position.x,
+                                    logical_position.y,
+                                ))
+                                .cloned()
+                            })
+                            .map(|n| n.file.clone())
+                        {
+                            ctx.submit_action::<GraphAction>(GraphAction::OpenFile(file));
+                        }
+                    }
+                    _ => {
+                        ctx.request_focus();
+                    }
+                }
+            }
+            masonry::core::PointerEvent::Move(movement) => {
+                let logical_position: LogicalPosition<f64> =
+                    movement.current.position.to_logical(ctx.get_scale_factor());
+                if let Some(file) = self
+                    .graph_state
+                    .graph_descriptor
+                    .as_ref()
+                    .and_then(|gd| {
+                        gd.find_node_at_position(Vec2::new(logical_position.x, logical_position.y))
+                            .cloned()
+                    })
+                    .map(|n| n.file.clone())
+                {
+                    ctx.submit_action::<GraphAction>(GraphAction::PrepareOpenFile(file));
+                }
+            }
+            masonry::core::PointerEvent::Scroll(scroll) => match scroll.delta {
+                ScrollDelta::PixelDelta(physical_position) => {
+                    let position: LogicalPosition<f64> =
+                        physical_position.to_logical(ctx.get_scale_factor());
+                    ctx.submit_action::<GraphAction>(GraphAction::Translate(Vec2::new(
+                        position.x, position.y,
+                    )));
+                }
+                _ => {}
+            },
+            masonry::core::PointerEvent::Gesture(gesture) => match gesture.gesture {
+                masonry::core::pointer::PointerGesture::Pinch(pinch_delta) => {
+                    let logical_position: LogicalPosition<f64> =
+                        gesture.state.position.to_logical(ctx.get_scale_factor());
+
+                    ctx.submit_action::<GraphAction>(GraphAction::Zoom(
+                        pinch_delta as f64,
+                        Vec2::new(logical_position.x, logical_position.y),
+                    ));
+
+                    let camera = self.graph_state.camera.borrow();
+                    if camera.as_ref().map_or(false, |c| c.is_zoomed_at_max()) {
+                        if let Some(file) = self
+                            .graph_state
+                            .graph_descriptor
+                            .as_ref()
+                            .and_then(|gd| {
+                                gd.find_node_at_position(Vec2::new(
+                                    logical_position.x,
+                                    logical_position.y,
+                                ))
+                                .cloned()
+                            })
+                            .map(|n| n.file.clone())
+                        {
+                            ctx.submit_action::<GraphAction>(GraphAction::OpenFile(file));
+                        }
+                    }
+                }
+                _ => {}
+            },
+            _ => {
+                // println!("GraphPortal received pointer event: {:?}", event);
+            }
+        }
+    }
+
+    fn get_debug_text(&self) -> Option<String> {
+        "GraphPortal".to_string().into()
+    }
+}
+
+struct GraphView;
+impl ViewMarker for GraphView {}
+impl View<AppState, (), ViewCtx> for GraphView {
+    type Element = Pod<GraphPortal>;
+    type ViewState = ();
+
+    fn build(
+        &self,
+        ctx: &mut ViewCtx,
+        app_state: &mut AppState,
+    ) -> (Self::Element, Self::ViewState) {
+        (
+            ctx.with_action_widget(|_| Pod::new(GraphPortal::new(app_state.graph_state.clone()))),
+            (),
+        )
+    }
+
+    fn rebuild(
+        &self,
+        prev: &Self,
+        view_state: &mut Self::ViewState,
+        ctx: &mut ViewCtx,
+        mut element: xilem::core::Mut<Self::Element>,
+        app_state: &mut AppState,
+    ) {
+        *element.widget = GraphPortal::new(app_state.graph_state.clone());
+        element.ctx.request_render();
+    }
+
+    fn teardown(
+        &self,
+        view_state: &mut Self::ViewState,
+        ctx: &mut ViewCtx,
+        element: xilem::core::Mut<'_, Self::Element>,
+    ) {
+        ctx.teardown_leaf(element);
+    }
+
+    fn message(
+        &self,
+        view_state: &mut Self::ViewState,
+        message: &mut xilem::core::MessageContext,
+        element: xilem::core::Mut<'_, Self::Element>,
+        app_state: &mut AppState,
+    ) -> xilem::core::MessageResult<()> {
+        if let Some(graph_action) = message.take_message::<GraphAction>() {
+            match graph_action.as_ref() {
+                GraphAction::Zoom(factor, origin) => {
+                    let mut camera = app_state.graph_state.camera.borrow_mut();
+                    if let Some(camera) = &mut *camera {
+                        camera.zoom(*factor, Some(*origin));
+                        MessageResult::RequestRebuild
+                    } else {
+                        MessageResult::Nop
+                    }
+                }
+                GraphAction::Translate(xy) => {
+                    let mut camera = app_state.graph_state.camera.borrow_mut();
+                    if let Some(camera) = &mut *camera {
+                        camera.translate(*xy);
+                        MessageResult::RequestRebuild
+                    } else {
+                        MessageResult::Nop
+                    }
+                }
+                GraphAction::PrepareOpenFile(file) => {
+                    app_state.editor_state.open_file(file.path.clone());
+                    MessageResult::Nop
+                }
+                GraphAction::OpenFile(file) => {
+                    // app_state.editor_state.open_file(file.path.clone());
+                    app_state.editor_state.focus_document(file.path.clone());
+                    MessageResult::RequestRebuild
+                }
+            }
+        } else {
+            MessageResult::Nop
+        }
+    }
+}
+
+#[derive(Debug)]
+enum GraphAction {
+    Zoom(f64, Vec2),
+    Translate(Vec2),
+    PrepareOpenFile(File),
+    OpenFile(File),
+}
