@@ -1,3 +1,6 @@
+use lsp_types::Diagnostic;
+
+use crate::editor_view::editor_state::path_from_url;
 use crate::keybindings::Keybindings;
 use crate::{
     document,
@@ -19,6 +22,7 @@ pub struct EditorState {
     pub document_scrollings: HashMap<PathBuf, (f64, f64)>,
     pub document_cursors: HashMap<PathBuf, Vec<cursor::Cursor>>,
     pub keybindings: Keybindings,
+    pub document_diagnostics: Arc<Mutex<HashMap<PathBuf, Vec<Diagnostic>>>>,
 }
 
 impl EditorState {
@@ -34,6 +38,8 @@ impl EditorState {
 
         let keybinds = Keybindings::new().expect("Failed to create keybinds");
 
+        let document_diagnostics = Arc::new(Mutex::new(HashMap::new()));
+
         // Spawn a thread to log all data received in proxy.notification_rx
         std::thread::spawn({
             let notification_rx = proxy.notification_rx.clone();
@@ -47,6 +53,7 @@ impl EditorState {
         std::thread::spawn({
             let core_rpc = proxy.core_rpc.clone();
             let core_rx = core_rpc.rx().clone();
+            let document_diagnostics = document_diagnostics.clone();
             move || {
                 while let Ok(notification) = core_rx.recv() {
                     match notification {
@@ -55,6 +62,23 @@ impl EditorState {
                         }
                         tuan_rpc::core::CoreRpc::Notification(notif) => {
                             tracing::debug!("CoreRpc::Notification - notif: {:?}", notif);
+
+                            match notif.as_ref() {
+                                tuan_rpc::core::CoreNotification::PublishDiagnostics {
+                                    diagnostics,
+                                } => {
+                                    println!("PublishDiagnostics: {:?}", diagnostics);
+                                    diagnostics.diagnostics.iter().for_each(|d| {
+                                        document_diagnostics
+                                            .lock()
+                                            .unwrap()
+                                            .entry(path_from_url(&diagnostics.uri))
+                                            .or_insert_with(Vec::new)
+                                            .push(d.clone());
+                                    });
+                                }
+                                _ => {}
+                            }
                         }
                         tuan_rpc::core::CoreRpc::Shutdown => {
                             tracing::debug!("CoreRpc::Shutdown");
@@ -72,6 +96,7 @@ impl EditorState {
             focused_document_path: None,
             document_scrollings: HashMap::new(),
             document_cursors: HashMap::new(),
+            document_diagnostics,
         }
     }
 }
